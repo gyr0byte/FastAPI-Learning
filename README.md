@@ -70,7 +70,7 @@ This project uses [uv](https://docs.astral.sh/uv/) for Python project and depend
 When an application module has been added to the repository, run it with Uvicorn using the module and application object defined by that implementation. For example:
 
 ```bash
-uv run uvicorn <module>:<app> --reload
+uv run --with uvicorn uvicorn <module>:<app> --reload
 ```
 
 Replace `<module>:<app>` with the appropriate import path, such as `main:app`.
