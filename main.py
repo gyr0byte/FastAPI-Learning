@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-
+import json
 
 app = FastAPI()
 
@@ -17,3 +17,7 @@ def greet():
 @app.get("/hello")
 def hello():
     return {"Hello, World!"}
+
+def get_data():
+    with open('students.json', 'r') as f:
+        return json.load(f)
