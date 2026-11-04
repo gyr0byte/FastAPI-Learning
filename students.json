@@ -1,0 +1,51 @@
+{
+    "S001": {
+        "name": "Gaurav Dulal",
+        "age": 20,
+        "email": "gaurav@example.com",
+        "course": "Python",
+        "marks": 92
+    },
+    "S002": {
+        "name": "John Doe",
+        "age": 22,
+        "email": "john@example.com",
+        "course": "Java",
+        "marks": 88
+    },
+    "S003": {
+        "name": "Jane Smith",
+        "age": 21,
+        "email": "jane@example.com",
+        "course": "Python",
+        "marks": 95
+    },
+    "S004": {
+        "name": "Alice Johnson",
+        "age": 23,
+        "email": "alice@example.com",
+        "course": "Python",
+        "marks": 90
+    },
+    "S005": {
+        "name": "Bob Brown",
+        "age": 20,
+        "email": "bob@example.com",
+        "course": "Java",
+        "marks": 85
+    },
+    "S006": {
+        "name": "Charlie Davis",
+        "age": 22,
+        "email": "charlie@example.com",
+        "course": "Python",
+        "marks": 89
+    },
+    "S007": {
+        "name": "David Evans",
+        "age": 21,
+        "email": "david@example.com",
+        "course": "Java",
+        "marks": 92
+    }
+}
