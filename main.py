@@ -18,6 +18,12 @@ def greet():
 def hello():
     return {"Hello, World!"}
 
+# Loading data from a JSON file 
+
 def get_data():
     with open('students.json', 'r') as f:
         return json.load(f)
+   
+@app.get("/student") 
+def student():
+    return get_data()
