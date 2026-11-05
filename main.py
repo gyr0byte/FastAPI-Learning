@@ -33,7 +33,7 @@ def student():
 # ====================
 
 @app.get("/student/{id}")
-def get_id(id: str = Path(..., description="The ID of the student to retrieve")):
+def get_id(id: str = Path(..., description="The ID of the student to retrieve", example="S001")):
     data = load_data()
     if id not in data:
         raise HTTPException(status_code=404, detail="Student not found")
