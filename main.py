@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import json
 
 app = FastAPI()
@@ -35,4 +35,6 @@ def student():
 @app.get("/student/{id}")
 def get_id(id: str):
     data = load_data()
+    if id not in data:
+        raise HTTPException(status_code=404, detail="Student not found")
     return data[id]
