@@ -35,4 +35,4 @@ def student():
 @app.get("/student/{id}")
 def get_id(id: str):
     data = load_data()
-    
+    return data[id]
