@@ -20,15 +20,19 @@ def hello():
 
 # Loading data from a JSON file 
 
-def get_data():
+def load_data():
     with open('students.json', 'r') as f:
         return json.load(f)
    
 @app.get("/student") 
 def student():
-    return get_data()
+    return load_data()
 
+# ====================
+# =  Path Parameters =
+# ====================
 
 @app.get("/student/{id}")
-def get_id():
-    pass
+def get_id(id: str):
+    data = load_data()
+    
