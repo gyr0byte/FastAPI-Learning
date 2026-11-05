@@ -27,3 +27,8 @@ def get_data():
 @app.get("/student") 
 def student():
     return get_data()
+
+
+@app.get("/student/{id}")
+def get_id():
+    pass
