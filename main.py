@@ -48,3 +48,12 @@ def get_id(id: str = Path(..., description="The ID of the student to retrieve", 
 course=Python -> This is a key value pair, where course is the key and Python is the value
 """
 
+@app.get("/filter")
+def filter_student(course: str):
+    data = load_data()
+    
+    if course not in data:
+        return data
+    
+    
+    
