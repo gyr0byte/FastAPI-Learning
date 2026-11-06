@@ -49,11 +49,14 @@ course=Python -> This is a key value pair, where course is the key and Python is
 """
 
 @app.get("/filter")
-def filter_student(course: str):
+def filter_student(course: str):  # course = Python
     data = load_data()
     
     if course not in data:
         return data
     
-    
+    filtered = []
+    for student_id, info in data.items():
+        if info['course'] == course:
+            filtered[student_id] = info
     
