@@ -38,3 +38,13 @@ def get_id(id: str = Path(..., description="The ID of the student to retrieve", 
     if id not in data:
         raise HTTPException(status_code=404, detail="Student not found")
     return data[id]
+
+# ====================
+# =  Query Parameters =
+# ====================
+
+"""
+? -> after this our query is present
+course=Python -> This is a key value pair, where course is the key and Python is the value
+"""
+
