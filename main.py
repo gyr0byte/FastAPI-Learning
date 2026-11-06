@@ -55,8 +55,12 @@ def filter_student(course: str):  # course = Python
     if course not in data:
         return data
     
-    filtered = []
+    filtered = {}
     for student_id, info in data.items():
         if info['course'] == course:
             filtered[student_id] = info
+            
+    return filtered
+
+
     
