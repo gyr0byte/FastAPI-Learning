@@ -54,10 +54,7 @@ def filter_student(course: str = Query(..., description="The course to filter by
     
     filtered = {}
     for student_id, info in data.items():
-        if info['course'] == course:
+        if info['course'].lower() == course.lower():
             filtered[student_id] = info
             
     return filtered
-
-
-    
