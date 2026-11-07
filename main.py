@@ -87,4 +87,9 @@ def sort_students(
     for student_id, info in data.items():
         info['id'] = student_id
         student.append(info)
+        
+        
+    # step 2 Sort the list based on the field provided
+    reverse = (order == "desc")
+    sorted_students = sorted(student, key=lambda x: x[sort_by], reverse=reverse)
     
