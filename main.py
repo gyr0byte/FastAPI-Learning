@@ -61,6 +61,7 @@ def filter_student(course: str = Query(..., description="The course to filter by
 
 # Sorting data using query parameters
 SORT_FIELDS = ["marks", "age", "name"]
+SORT_ORDER = ["asc", "desc"]
 
 @app.get("/sort")
 def sort_students(
@@ -71,4 +72,10 @@ def sort_students(
         raise HTTPException(
             status_code=404,
             detail="Invalid category to sort by!"
+        )
+    
+    if order not in SORT_ORDER:
+        raise HTTPException(
+            status_code=404,
+            detail="Invalid order type"
         )
