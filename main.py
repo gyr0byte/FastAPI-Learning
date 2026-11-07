@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Path
+from fastapi import FastAPI, HTTPException, Path, Query
 import json
 
 app = FastAPI()
@@ -49,11 +49,8 @@ course=Python -> This is a key value pair, where course is the key and Python is
 """
 
 @app.get("/filter")
-def filter_student(course: str):  # course = Python
+def filter_student(course: str = Query(..., description="The course to filter by", example="Python")):  # course = Python
     data = load_data()
-    
-    if course not in data:
-        return data
     
     filtered = {}
     for student_id, info in data.items():
