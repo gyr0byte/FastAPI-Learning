@@ -79,3 +79,12 @@ def sort_students(
             status_code=404,
             detail="Invalid order type"
         )
+        
+    data = load_data()
+    
+    #steps 1 Turn the dictionary into a list, putting the id inside each student
+    student = []
+    for student_id, info in data.items():
+        info['id'] = student_id
+        student.append(info)
+    
