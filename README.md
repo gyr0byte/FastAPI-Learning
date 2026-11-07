@@ -1,86 +1,81 @@
 # FastAPI Learning
 
-Personal learning repository for studying FastAPI and Python backend development through structured lessons, exercises, and practical implementations.
+An introductory FastAPI project that serves student data from
+[`students.json`](students.json). The current implementation focuses on
+GET endpoints, path and query parameters, validation, filtering, and sorting.
 
-## Objectives
+## What is implemented
 
-- Build a solid foundation in Python backend development.
-- Learn how to design and implement APIs with FastAPI.
-- Practice validation, error handling, databases, deployment, and related backend workflows.
-- Document progress and keep useful examples available for future reference.
+- FastAPI application created in [`main.py`](main.py).
+- Student data loaded from a local JSON file.
+- Interactive API documentation generated automatically by FastAPI.
+- 404 responses for unknown student IDs and invalid sorting options.
+- Case-insensitive course filtering.
+- Student sorting by name, age, or marks in ascending or descending order.
 
-## Technologies Being Explored
+## Requirements
 
-- Python
-- FastAPI
-- Uvicorn
-- Pydantic
-- PostgreSQL
-- SQLAlchemy
-- Docker and Docker Compose
-- Cloud deployment platforms
+- Python 3.10 or newer
+- [uv](https://docs.astral.sh/uv/)
 
-## Learning Roadmap
+The project uses FastAPI and declares its dependencies in
+[`pyproject.toml`](pyproject.toml).
 
-- [ ] API fundamentals and client-server architecture
-- [ ] FastAPI basics and Uvicorn
-- [ ] HTTP methods (GET, POST, PUT, DELETE)
-- [ ] Path parameters and query parameters
-- [ ] HTTP status codes and error handling
-- [ ] Filtering, sorting, and pagination
-- [ ] Pydantic models and data validation
-- [ ] CRUD operations
-- [ ] Frontend integration and CORS
-- [ ] PostgreSQL and SQLAlchemy
-- [ ] Database sessions and dependency injection
-- [ ] Docker and Docker Compose
-- [ ] Cloud deployment
+## Setup
 
-## Installation and Environment Setup
-
-This project uses [uv](https://docs.astral.sh/uv/) for Python project and dependency management.
-
-1. Install Python 3.10 or newer.
-2. Install uv by following the [official installation guide](https://docs.astral.sh/uv/getting-started/installation/).
-3. Clone this repository and change into its directory:
-
-   ```bash
-   git clone https://github.com/gyr0byte/FastAPI-Learning.git
-   cd FastAPI-Learning
-   ```
-
-4. Create the project environment and install the declared dependencies:
-
-   ```bash
-   uv sync
-   ```
-
-5. Activate the environment if you want to use its commands directly:
-
-   ```bash
-   # Windows PowerShell
-   .venv\Scripts\Activate.ps1
-
-   # macOS/Linux
-   source .venv/bin/activate
-   ```
-
-## Running a FastAPI Application
-
-When an application module has been added to the repository, run it with Uvicorn using the module and application object defined by that implementation. For example:
+Clone the repository and install the project dependencies:
 
 ```bash
-uv run --with uvicorn uvicorn <module>:<app> --reload
+git clone https://github.com/gyr0byte/FastAPI-Learning.git
+cd FastAPI-Learning
+uv sync
 ```
 
-Replace `<module>:<app>` with the appropriate import path, such as `main:app`.
+## Run the application
 
-While the development server is running, open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) to use FastAPI's interactive API documentation.
+Start the development server with:
 
-## Future Projects and Practical Implementations
+```bash
+uv run --with uvicorn uvicorn main:app --reload
+```
 
-As the course progresses, this repository will collect small projects and practical implementations that apply the concepts in the roadmap. Each addition will be documented as the relevant topics are completed.
+The API is available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
+FastAPI's interactive Swagger UI is available at
+[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
 
-## Note
+## API endpoints
 
-This repository documents my learning journey. It is not a finished production application.
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `GET` | `/` | Returns a welcome message. |
+| `GET` | `/hello` | Returns a simple hello message. |
+| `GET` | `/student` | Returns all students from `students.json`. |
+| `GET` | `/student/{id}` | Returns one student by ID, such as `S001`. |
+| `GET` | `/filter?course=Python` | Returns students enrolled in the specified course. |
+| `GET` | `/sort?sort_by=marks&order=desc` | Sorts students by `marks`, `age`, or `name`. |
+
+### Sorting options
+
+- `sort_by`: `marks`, `age`, or `name`
+- `order`: `asc` or `desc`
+
+Invalid student IDs, sort fields, and sort orders return an HTTP 404 response
+with an explanatory error message.
+
+## Example requests
+
+```text
+GET http://127.0.0.1:8000/student/S001
+GET http://127.0.0.1:8000/filter?course=python
+GET http://127.0.0.1:8000/sort?sort_by=marks&order=desc
+```
+
+## Next learning topics
+
+- POST, PUT, and DELETE endpoints
+- Pydantic models and request validation
+- CRUD operations
+- Database integration with PostgreSQL and SQLAlchemy
+- Dependency injection, CORS, testing, Docker, and deployment
+
+This repository is a learning project rather than a production application.
