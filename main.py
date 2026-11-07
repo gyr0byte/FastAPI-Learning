@@ -65,8 +65,8 @@ SORT_ORDER = ["asc", "desc"]
 
 @app.get("/sort")
 def sort_students(
-    sort_by : str,
-    order : str
+    sort_by : str = Query(..., description="The field to sort by", example="marks"),
+    order : str = Query(..., description="The order to sort by", example="asc")
 ):
     if sort_by not in SORT_FIELDS:
         raise HTTPException(
@@ -92,4 +92,6 @@ def sort_students(
     # step 2 Sort the list based on the field provided
     reverse = (order == "desc")
     sorted_students = sorted(student, key=lambda x: x[sort_by], reverse=reverse)
+    
+    return sorted_students
     
