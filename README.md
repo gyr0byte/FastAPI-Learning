@@ -135,6 +135,14 @@ The response contains the requested `page`, the `limit`, the
       "email": "gaurav@example.com",
       "course": "Python",
       "marks": 92
+    },
+    {
+      "id": "S002",
+      "name": "John Doe",
+      "age": 22,
+      "email": "john@example.com",
+      "course": "Java",
+      "marks": 88
     }
   ]
 }
