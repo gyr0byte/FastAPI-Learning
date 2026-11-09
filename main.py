@@ -95,3 +95,16 @@ def sort_students(
     
     return sorted_students
     
+# ====================
+# =  Pagination      =
+# ====================
+
+"""
+Pagination is the process of dividing a large dataset into smaller, manageable chunks.
+https://127.0.0.1:8000/paginate?page=1&limit=2
+
+page -> The page number to retrieve
+limit -> The number of items to retrieve per page
+"""
+
+@app.get("/paginate")
