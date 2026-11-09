@@ -112,7 +112,10 @@ end_index = start_index + limit
 """
 
 @app.get("/paginate")
-def paginate_student(page:int, limit:int):
+def paginate_student(
+    page:int = Query(1, ge=1, description="Which page you want (start from 1)"), # ge means greater then
+    limit:int= Query(2, ge=1, le=100, description="How many students on one page (1 to 100)") # le means less than
+):
     data = load_data()
 
     # Turn the dictionary into a list and putting the id inside each element. 
