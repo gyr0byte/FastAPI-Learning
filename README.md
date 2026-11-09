@@ -187,5 +187,4 @@ Planned topics for future iterations include:
 
 ## License
 
-This repository is maintained as a personal learning project. Use the
-examples freely for learning and experimentation.
+This project is available under the [MIT License](LICENSE).
