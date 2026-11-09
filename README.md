@@ -1,96 +1,183 @@
 # FastAPI Learning
 
-An introductory FastAPI project that serves student data from
-[`students.json`](students.json). The current implementation focuses on
-GET endpoints, path and query parameters, validation, filtering, sorting, and
-pagination.
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115%2B-009688?logo=fastapi&logoColor=white)
+![License](https://img.shields.io/badge/License-Learning%20Project-lightgrey)
 
-## What is implemented
+A hands-on FastAPI learning project that progressively demonstrates how to
+build a small REST API with Python. The current API serves student data from a
+local JSON file and covers core FastAPI concepts such as routes, path
+parameters, query parameters, validation, filtering, sorting, and pagination.
 
-- FastAPI application created in [`main.py`](main.py).
-- Student data loaded from a local JSON file.
-- Interactive API documentation generated automatically by FastAPI.
-- 404 responses for unknown student IDs and invalid sorting options.
-- Case-insensitive course filtering.
-- Student sorting by name, age, or marks in ascending or descending order.
-- Pagination with validated `page` and `limit` query parameters.
-- Pagination metadata, including the current page, page size, total students,
-  and the students returned for that page.
+> This is an educational project, not a production-ready application.
+
+## Contents
+
+- [Features](#features)
+- [Project structure](#project-structure)
+- [Requirements](#requirements)
+- [Getting started](#getting-started)
+- [API reference](#api-reference)
+- [Validation and errors](#validation-and-errors)
+- [Interactive documentation](#interactive-documentation)
+- [Learning roadmap](#learning-roadmap)
+
+## Features
+
+- FastAPI application with simple GET endpoints.
+- Student records loaded from [`students.json`](students.json).
+- Path parameter lookup for individual students.
+- Case-insensitive filtering by course.
+- Sorting by name, age, or marks in ascending or descending order.
+- Pagination with validated page and page-size parameters.
+- Automatic interactive API documentation through Swagger UI and ReDoc.
+- Clear HTTP errors for missing students and invalid sorting options.
+
+## Project structure
+
+```text
+FastAPI-Learning/
+├── main.py          # FastAPI application and route definitions
+├── students.json    # Sample student data
+├── pyproject.toml   # Project metadata and dependencies
+└── README.md        # Project documentation
+```
 
 ## Requirements
 
 - Python 3.10 or newer
-- [uv](https://docs.astral.sh/uv/)
+- [uv](https://docs.astral.sh/uv/) for dependency management
 
-The project uses FastAPI and declares its dependencies in
-[`pyproject.toml`](pyproject.toml).
+The project declares FastAPI in [`pyproject.toml`](pyproject.toml).
 
-## Setup
+## Getting started
 
-Clone the repository and install the project dependencies:
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/gyr0byte/FastAPI-Learning.git
 cd FastAPI-Learning
+```
+
+### 2. Install dependencies
+
+```bash
 uv sync
 ```
 
-## Run the application
-
-Start the development server with:
+### 3. Start the development server
 
 ```bash
 uv run --with uvicorn uvicorn main:app --reload
 ```
 
-The API is available at [http://127.0.0.1:8000](http://127.0.0.1:8000).
-FastAPI's interactive Swagger UI is available at
-[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+The API will be available at:
 
-## API endpoints
+```text
+http://127.0.0.1:8000
+```
+
+## API reference
 
 | Method | Endpoint | Description |
 | --- | --- | --- |
 | `GET` | `/` | Returns a welcome message. |
 | `GET` | `/hello` | Returns a simple hello message. |
-| `GET` | `/student` | Returns all students from `students.json`. |
+| `GET` | `/student` | Returns all students. |
 | `GET` | `/student/{id}` | Returns one student by ID, such as `S001`. |
-| `GET` | `/filter?course=Python` | Returns students enrolled in the specified course. |
-| `GET` | `/sort?sort_by=marks&order=desc` | Sorts students by `marks`, `age`, or `name`. |
-| `GET` | `/paginate?page=1&limit=2` | Returns a page of students with pagination metadata. |
+| `GET` | `/filter?course=Python` | Returns students enrolled in a course. |
+| `GET` | `/sort?sort_by=marks&order=desc` | Sorts students by a supported field and order. |
+| `GET` | `/paginate?page=1&limit=2` | Returns one page of students with metadata. |
 
-### Sorting options
+### Sorting
 
-- `sort_by`: `marks`, `age`, or `name`
-- `order`: `asc` or `desc`
+The `/sort` endpoint accepts:
 
-Invalid student IDs, sort fields, and sort orders return an HTTP 404 response
-with an explanatory error message.
+| Parameter | Allowed values |
+| --- | --- |
+| `sort_by` | `marks`, `age`, `name` |
+| `order` | `asc`, `desc` |
 
-### Pagination options
+Example:
 
-- `page`: The page number, starting at `1`.
-- `limit`: The number of students per page, from `1` to `100`.
+```text
+GET http://127.0.0.1:8000/sort?sort_by=marks&order=desc
+```
 
-The pagination response includes `page`, `limit`, `total_students`, and a
-`students` list. Pages beyond the available data return an empty `students`
-list.
+### Pagination
 
-## Example requests
+The `/paginate` endpoint accepts:
+
+| Parameter | Default | Constraints |
+| --- | --- | --- |
+| `page` | `1` | Must be at least `1` |
+| `limit` | `2` | Must be between `1` and `100` |
+
+Example:
+
+```text
+GET http://127.0.0.1:8000/paginate?page=1&limit=2
+```
+
+The response contains the requested `page`, the `limit`, the
+`total_students` count, and the page's `students` list:
+
+```json
+{
+  "page": 1,
+  "limit": 2,
+  "total_students": 7,
+  "students": [
+    {
+      "id": "S001",
+      "name": "Gaurav Dulal",
+      "age": 20,
+      "email": "gaurav@example.com",
+      "course": "Python",
+      "marks": 92
+    }
+  ]
+}
+```
+
+### Other examples
 
 ```text
 GET http://127.0.0.1:8000/student/S001
 GET http://127.0.0.1:8000/filter?course=python
-GET http://127.0.0.1:8000/sort?sort_by=marks&order=desc
-GET http://127.0.0.1:8000/paginate?page=1&limit=2
 ```
 
-## Next learning topics
+## Validation and errors
 
+- An unknown student ID returns HTTP `404`.
+- An unsupported sort field returns HTTP `404`.
+- An unsupported sort order returns HTTP `404`.
+- `page` values below `1` are rejected by FastAPI validation.
+- `limit` values below `1` or above `100` are rejected by FastAPI validation.
+- A page beyond the available data returns an empty `students` list.
+
+## Interactive documentation
+
+With the server running, FastAPI provides:
+
+- [Swagger UI](http://127.0.0.1:8000/docs) for exploring and trying endpoints.
+- [ReDoc](http://127.0.0.1:8000/redoc) for a clean API reference.
+- [OpenAPI schema](http://127.0.0.1:8000/openapi.json) in JSON format.
+
+## Learning roadmap
+
+Planned topics for future iterations include:
+
+- Pydantic models and richer request/response validation
 - POST, PUT, and DELETE endpoints
-- Pydantic models and request validation
-- CRUD operations
+- Full CRUD operations
 - Database integration with PostgreSQL and SQLAlchemy
-- Dependency injection, CORS, testing, Docker, and deployment
+- Dependency injection
+- CORS configuration
+- Automated API testing
+- Docker and deployment
 
-This repository is a learning project rather than a production application.
+## License
+
+This repository is maintained as a personal learning project. Use the
+examples freely for learning and experimentation.
