@@ -112,3 +112,11 @@ end_index = start_index + limit
 """
 
 @app.get("/paginate")
+def paginate_student(page:int, limit:int):
+    data = load_data()
+
+    # Turn the dictionary into a list and putting the id inside each element. 
+    student = []
+    for student_id, info in data.items():
+        info['id'] = student_id
+        student.append(info)
