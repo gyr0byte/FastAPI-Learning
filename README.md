@@ -2,7 +2,8 @@
 
 An introductory FastAPI project that serves student data from
 [`students.json`](students.json). The current implementation focuses on
-GET endpoints, path and query parameters, validation, filtering, and sorting.
+GET endpoints, path and query parameters, validation, filtering, sorting, and
+pagination.
 
 ## What is implemented
 
@@ -12,6 +13,9 @@ GET endpoints, path and query parameters, validation, filtering, and sorting.
 - 404 responses for unknown student IDs and invalid sorting options.
 - Case-insensitive course filtering.
 - Student sorting by name, age, or marks in ascending or descending order.
+- Pagination with validated `page` and `limit` query parameters.
+- Pagination metadata, including the current page, page size, total students,
+  and the students returned for that page.
 
 ## Requirements
 
@@ -53,6 +57,7 @@ FastAPI's interactive Swagger UI is available at
 | `GET` | `/student/{id}` | Returns one student by ID, such as `S001`. |
 | `GET` | `/filter?course=Python` | Returns students enrolled in the specified course. |
 | `GET` | `/sort?sort_by=marks&order=desc` | Sorts students by `marks`, `age`, or `name`. |
+| `GET` | `/paginate?page=1&limit=2` | Returns a page of students with pagination metadata. |
 
 ### Sorting options
 
@@ -62,12 +67,22 @@ FastAPI's interactive Swagger UI is available at
 Invalid student IDs, sort fields, and sort orders return an HTTP 404 response
 with an explanatory error message.
 
+### Pagination options
+
+- `page`: The page number, starting at `1`.
+- `limit`: The number of students per page, from `1` to `100`.
+
+The pagination response includes `page`, `limit`, `total_students`, and a
+`students` list. Pages beyond the available data return an empty `students`
+list.
+
 ## Example requests
 
 ```text
 GET http://127.0.0.1:8000/student/S001
 GET http://127.0.0.1:8000/filter?course=python
 GET http://127.0.0.1:8000/sort?sort_by=marks&order=desc
+GET http://127.0.0.1:8000/paginate?page=1&limit=2
 ```
 
 ## Next learning topics
