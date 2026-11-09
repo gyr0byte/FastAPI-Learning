@@ -105,6 +105,10 @@ https://127.0.0.1:8000/paginate?page=1&limit=2
 
 page -> The page number to retrieve
 limit -> The number of items to retrieve per page
+
+formula to calculate the starting index of the items to retrieve:
+start_index = (page - 1) * limit
+end_index = start_index + limit
 """
 
 @app.get("/paginate")
