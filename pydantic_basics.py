@@ -14,7 +14,7 @@ bad_student = {
     "email":"not-an-email"
 }
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 """
 STEP 2 -> BASEMODEL + TYPE HINTS
@@ -39,8 +39,11 @@ le = less than or equal to
 """
 
 class RuleStudent(BaseModel):
-    name : str
-    age : int
-    marks : int
-    course : str
-    phone : str
+    name : str = Field(..., min_length=2, max_length=100)
+    age : int = Field(..., gt=0, le=100)
+    marks : int = Field(..., ge=0, le=100)
+    course : str = "Python"
+    phone : str | None = None
+    
+s = RuleStudent(name = "John", age = 20, marks = 80)
+print(s.name, s.age, s.marks, s.course, s.phone)
