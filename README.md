@@ -40,6 +40,8 @@ FastAPI-Learning/
 ├── main.py          # FastAPI application and route definitions
 ├── students.json    # Sample student data
 ├── pyproject.toml   # Project metadata and dependencies
+├── .gitignore       # Ignored local, cache, and build files
+├── LICENSE          # MIT license
 └── README.md        # Project documentation
 ```
 
@@ -48,7 +50,8 @@ FastAPI-Learning/
 - Python 3.10 or newer
 - [uv](https://docs.astral.sh/uv/) for dependency management
 
-The project declares FastAPI in [`pyproject.toml`](pyproject.toml).
+The project declares FastAPI and Uvicorn in
+[`pyproject.toml`](pyproject.toml).
 
 ## Getting started
 
@@ -68,7 +71,7 @@ uv sync
 ### 3. Start the development server
 
 ```bash
-uv run --with uvicorn uvicorn main:app --reload
+uv run uvicorn main:app --reload
 ```
 
 The API will be available at:
