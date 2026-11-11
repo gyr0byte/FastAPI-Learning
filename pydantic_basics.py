@@ -14,7 +14,7 @@ bad_student = {
     "email":"not-an-email"
 }
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 
 """
 STEP 2 -> BASEMODEL + TYPE HINTS
@@ -39,11 +39,25 @@ le = less than or equal to
 """
 
 class RuleStudent(BaseModel):
-    name : str = Field(..., min_length=2, max_length=100)
+    name : str = Field(..., min_length=2, max_length=100) # ... = required field
     age : int = Field(..., gt=0, le=100)
     marks : int = Field(..., ge=0, le=100)
-    course : str = "Python"
+    course : str = "Python" # default value = "Python"
     phone : str | None = None
     
 s = RuleStudent(name = "John", age = 20, marks = 80)
-print(s.name, s.age, s.marks, s.course, s.phone)
+# print(s.name, s.age, s.marks, s.course, s.phone)
+
+
+
+"""
+STEP 4 -> EMAIL STRINGS
+checks the text is a valid email address
+"""
+
+class EmailStudent(BaseModel):
+    name : str
+    email : EmailStr
+    
+s = EmailStudent(name = "John", email = "john@example.com")
+print(s.name, s.email)
