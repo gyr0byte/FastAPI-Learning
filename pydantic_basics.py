@@ -14,7 +14,7 @@ bad_student = {
     "email":"not-an-email"
 }
 
-from pydantic import BaseModel, Field, EmailStr, field_validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, computed_field
 
 """
 STEP 2 -> BASEMODEL + TYPE HINTS
@@ -66,6 +66,7 @@ s = EmailStudent(name = "John", email = "john@example.com")
 """
 STEP 5 -> FINAL STUDENT MODEL
 1. field_validator -> we set our custom validation rules
+2. computed_field -> a value pydantic calculates for us based on other fields
 """
 
 class Student(BaseModel):
@@ -83,5 +84,22 @@ class Student(BaseModel):
         if not value.replace(" ", "").isalpha():
             raise ValueError("Name must contain only alphabets and spaces")
         
-        
-        
+        return value.title() # capitalize the name
+    
+    
+    @computed_field
+    @property
+    def grade(self):
+        if self.marks >= 90:
+            return "A+"
+        elif self.marks >= 80:
+            return "A"
+        elif self.marks >= 70:  
+            return "B"
+        elif self.marks >= 60:
+            return "C"
+        else:
+            return "F"
+    
+s = Student(id="S001", name="john doe", age=20, course="Python", marks=80, email="john@example.com")
+print(s.id, s.name, s.age, s.course, s.marks, s.email)
