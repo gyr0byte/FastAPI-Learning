@@ -89,7 +89,7 @@ class Student(BaseModel):
     
     @computed_field
     @property
-    def grade(self):
+    def grade(self) -> str:
         if self.marks >= 90:
             return "A+"
         elif self.marks >= 80:
@@ -102,4 +102,4 @@ class Student(BaseModel):
             return "F"
     
 s = Student(id="S001", name="john doe", age=20, course="Python", marks=80, email="john@example.com")
-print(s.id, s.name, s.age, s.course, s.marks, s.email)
+print(s.id, s.name, s.age, s.course, s.marks, s.email, s.grade)
