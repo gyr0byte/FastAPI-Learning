@@ -14,7 +14,7 @@ bad_student = {
     "email":"not-an-email"
 }
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
 
 """
 STEP 2 -> BASEMODEL + TYPE HINTS
@@ -60,4 +60,23 @@ class EmailStudent(BaseModel):
     email : EmailStr
     
 s = EmailStudent(name = "John", email = "john@example.com")
-print(s.name, s.email)
+# print(s.name, s.email)
+
+
+"""
+STEP 5 -> FINAL STUDENT MODEL
+1. field_validator -> we set our custom validation rules
+"""
+
+class Student(BaseModel):
+    id : str = Field(..., example="S001")
+    name : str = Field(..., min_length=2, max_length=100)
+    age : int = Field(..., gt=0, le=100)
+    course : str = Field(..., min_length=2, max_length=100)
+    marks : int = Field(..., ge=0, le=100)
+    email : EmailStr
+
+    # custom rule : name must contain only alphabets and spaces
+    @field_validator("name")
+    def check_name(cls, value):
+        
