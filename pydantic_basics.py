@@ -78,5 +78,10 @@ class Student(BaseModel):
 
     # custom rule : name must contain only alphabets and spaces
     @field_validator("name")
-    def check_name(cls, value):
+    @classmethod
+    def check_name(cls, value): # value = name
+        if not value.replace(" ", "").isalpha():
+            raise ValueError("Name must contain only alphabets and spaces")
+        
+        
         
