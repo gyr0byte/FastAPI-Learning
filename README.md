@@ -8,6 +8,8 @@ A hands-on FastAPI learning project that progressively demonstrates how to
 build a small REST API with Python. The current API serves student data from a
 local JSON file and covers core FastAPI concepts such as routes, path
 parameters, query parameters, validation, filtering, sorting, and pagination.
+It also includes a standalone introduction to Pydantic data models and
+validation.
 
 > This is an educational project, not a production-ready application.
 
@@ -18,6 +20,7 @@ parameters, query parameters, validation, filtering, sorting, and pagination.
 - [Requirements](#requirements)
 - [Getting started](#getting-started)
 - [API reference](#api-reference)
+- [Pydantic fundamentals](#pydantic-fundamentals)
 - [Validation and errors](#validation-and-errors)
 - [Interactive documentation](#interactive-documentation)
 - [Learning roadmap](#learning-roadmap)
@@ -30,6 +33,8 @@ parameters, query parameters, validation, filtering, sorting, and pagination.
 - Case-insensitive filtering by course.
 - Sorting by name, age, or marks in ascending or descending order.
 - Pagination with validated page and page-size parameters.
+- Pydantic models with type hints, field constraints, email validation, custom
+  validators, and computed fields.
 - Automatic interactive API documentation through Swagger UI and ReDoc.
 - Clear HTTP errors for missing students and invalid sorting options.
 
@@ -38,6 +43,7 @@ parameters, query parameters, validation, filtering, sorting, and pagination.
 ```text
 FastAPI-Learning/
 ├── main.py          # FastAPI application and route definitions
+├── pydantic_basics.py # Pydantic fundamentals and validation examples
 ├── students.json    # Sample student data
 ├── pyproject.toml   # Project metadata and dependencies
 ├── .gitignore       # Ignored local, cache, and build files
@@ -158,6 +164,33 @@ GET http://127.0.0.1:8000/student/S001
 GET http://127.0.0.1:8000/filter?course=python
 ```
 
+## Pydantic fundamentals
+
+[`pydantic_basics.py`](pydantic_basics.py) is a standalone learning module
+covering the progression from unvalidated dictionaries to structured,
+validated models:
+
+- `SimpleStudent` demonstrates `BaseModel` and Python type hints.
+- `RuleStudent` demonstrates required fields, default values, optional fields,
+  and `Field` constraints such as `min_length`, `gt`, `ge`, and `le`.
+- `EmailStudent` demonstrates validation with `EmailStr`.
+- `Student` combines field constraints, email validation, a custom
+  `field_validator`, and a computed `grade` field based on marks.
+- Student names are normalized to title case and must contain only letters and
+  spaces.
+
+Run the lesson directly with:
+
+```bash
+uv run python pydantic_basics.py
+```
+
+The example prints a validated student with the calculated grade:
+
+```text
+S001 John Doe 20 Python 80 john@example.com A
+```
+
 ## Validation and errors
 
 - An unknown student ID returns HTTP `404`.
@@ -179,7 +212,7 @@ With the server running, FastAPI provides:
 
 Planned topics for future iterations include:
 
-- Pydantic models and richer request/response validation
+- Integrating the Pydantic models with FastAPI response models
 - POST, PUT, and DELETE endpoints
 - Full CRUD operations
 - Database integration with PostgreSQL and SQLAlchemy
