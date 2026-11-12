@@ -111,7 +111,7 @@ turn a model back into a dictionary ( so that we can save it to a database or se
 """
 
 data = s.model_dump() # convert model to dictionary
-print(data) 
+# print(data) 
 
 import json
 
@@ -124,3 +124,4 @@ with open("students.json", "r") as file:
     
 for student_id, info in raw.items():
     s = Student(id=student_id, **info) # unpack the dictionary into the model
+    print(s.id, s.name, s.age, s.course, s.marks, s.email, s.grade)

@@ -34,7 +34,8 @@ validation.
 - Sorting by name, age, or marks in ascending or descending order.
 - Pagination with validated page and page-size parameters.
 - Pydantic models with type hints, field constraints, email validation, custom
-  validators, and computed fields.
+  validators, computed fields, model-to-dictionary conversion, and validation
+  of the repository's JSON data.
 - Automatic interactive API documentation through Swagger UI and ReDoc.
 - Clear HTTP errors for missing students and invalid sorting options.
 
@@ -178,6 +179,9 @@ validated models:
   `field_validator`, and a computed `grade` field based on marks.
 - Student names are normalized to title case and must contain only letters and
   spaces.
+- `model_dump()` converts a validated model into a standard Python dictionary.
+- Every record in [`students.json`](students.json) is loaded, validated through
+  the `Student` model, and printed with its calculated grade.
 
 Run the lesson directly with:
 
@@ -185,10 +189,17 @@ Run the lesson directly with:
 uv run python pydantic_basics.py
 ```
 
-The example prints a validated student with the calculated grade:
+The example validates and prints all seven students with their calculated
+grades:
 
 ```text
-S001 John Doe 20 Python 80 john@example.com A
+S001 Gaurav Dulal 20 Python 92 gaurav@example.com A+
+S002 John Doe 22 Java 88 john@example.com A
+S003 Jane Smith 21 Python 95 jane@example.com A+
+S004 Alice Johnson 23 Python 90 alice@example.com A+
+S005 Bob Brown 20 Java 85 bob@example.com A
+S006 Charlie Davis 22 Python 89 charlie@example.com A
+S007 David Evans 21 Java 92 david@example.com A+
 ```
 
 ## Validation and errors
