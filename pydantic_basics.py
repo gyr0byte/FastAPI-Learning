@@ -102,4 +102,13 @@ class Student(BaseModel):
             return "F"
     
 s = Student(id="S001", name="john doe", age=20, course="Python", marks=80, email="john@example.com")
-print(s.id, s.name, s.age, s.course, s.marks, s.email, s.grade)
+# print(s.id, s.name, s.age, s.course, s.marks, s.email, s.grade)
+
+
+"""
+STEP 6 -> MODEL_DUMP()
+turn a model back into a dictionary ( so that we can save it to a database or send it over the network )
+"""
+
+data = s.model_dump() # convert model to dictionary
+print(data) 
