@@ -112,3 +112,15 @@ turn a model back into a dictionary ( so that we can save it to a database or se
 
 data = s.model_dump() # convert model to dictionary
 print(data) 
+
+import json
+
+"""
+STEP 7 -> CHECK OUT REAL DATA (students.json)
+Every student in our file will go through the Student model and be validated.
+"""
+with open("students.json", "r") as file:
+    raw = json.load(file)
+    
+for student_id, info in raw.items():
+    s = Student(id=student_id, **info) # unpack the dictionary into the model
