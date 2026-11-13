@@ -14,7 +14,7 @@ bad_student = {
     "email":"not-an-email"
 }
 
-from pydantic import BaseModel, Field, EmailStr, field_validator, computed_field
+from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
 
 """
 STEP 2 -> BASEMODEL + TYPE HINTS

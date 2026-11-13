@@ -137,3 +137,13 @@ def paginate_student(
         "total_students" : total_students,
         "students" : page_student
     }
+    
+    
+"""
+REQUEST BODY
+
+POST -> data comes in a body (a JSON object sent with the request)
+
+when a function argument is a Pydantic model, FastAPI will automatically read the request body 
+and convert it into an instance of that model, also validates.
+"""
