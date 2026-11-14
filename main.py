@@ -205,6 +205,13 @@ class StudentUpdate(BaseModel):
     marks   : int | None = Field(None, ge=0, le=100)
     email   : EmailStr | None = None
 
+
+""" 
+PUT -> data comes in a body (a JSON object sent with the request)
+
+"""
+
+
 @app.put("/update/{id}")
 def update_student(
     student_update: StudentUpdate,
@@ -212,8 +219,26 @@ def update_student(
 ):
     data = load_data()
     
-    if student.id not in data:
+    if id not in data:
         raise HTTPException(
             status_code=404,
             detail=f"Student with id '{id}' not found!"
         )
+        
+    # STEP 1 : The student as it is right now
+    existing = data[id]
+    
+    # STEP 2 : Only the field the client actually sent
+    update = student_update.model_dump()
+
+    # STEP 3 : Copy the new value on the top of old one
+    for key, value in update.items():
+        existing[key] = value
+        
+    # STEP 4 : Check the final student again
+    student = Student(id=id, **existing) # unpacking the existing dictionary into the Student model
+
+    data[id] = student.model_dump(exclude={"id", "grade"})
+    save_data(data)
+    
+    return {"message" : "Student updated successfully!", "student" : student}

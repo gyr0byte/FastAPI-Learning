@@ -2,9 +2,9 @@
     "S001": {
         "name": "Gaurav Dulal",
         "age": 20,
-        "email": "gaurav@example.com",
-        "course": "Python",
-        "marks": 92
+        "course": "AI",
+        "marks": 100,
+        "email": "gqurav69@gmail.com"
     },
     "S002": {
         "name": "John Doe",
