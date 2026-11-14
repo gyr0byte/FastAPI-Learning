@@ -1,6 +1,7 @@
 import json
 
 from fastapi import FastAPI, HTTPException, Path, Query
+from pydantic import BaseModel, computed_field, field_validator, EmailStr, Field
 
 app = FastAPI()
 
@@ -147,3 +148,39 @@ POST -> data comes in a body (a JSON object sent with the request)
 when a function argument is a Pydantic model, FastAPI will automatically read the request body 
 and convert it into an instance of that model, also validates.
 """
+
+class Student(BaseModel):
+    id : str = Field(..., example="S001")
+    name : str = Field(..., min_length=2, max_length=100)
+    age : int = Field(..., gt=0, le=100)
+    course : str = Field(..., min_length=2, max_length=100)
+    marks : int = Field(..., ge=0, le=100)
+    email : EmailStr
+
+    # custom rule : name must contain only alphabets and spaces
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, value): # value = name
+        if not value.replace(" ", "").isalpha():
+            raise ValueError("Name must contain only alphabets and spaces")
+        
+        return value.title() # capitalize the name
+    
+    
+    @computed_field
+    @property
+    def grade(self) -> str:
+        if self.marks >= 90:
+            return "A+"
+        elif self.marks >= 80:
+            return "A"
+        elif self.marks >= 70:  
+            return "B"
+        elif self.marks >= 60:
+            return "C"
+        else:
+            return "F"
+
+@app.post("/create", status_code=201)
+def create_student():
+    
