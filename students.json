@@ -47,5 +47,13 @@
         "email": "david@example.com",
         "course": "Java",
         "marks": 92
+    },
+    "S008": {
+        "name": "Ava Monroe",
+        "age": 22,
+        "course": "Python",
+        "marks": 89,
+        "email": "ava@example.com",
+        "grade": "A"
     }
 }

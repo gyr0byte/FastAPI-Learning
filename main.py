@@ -190,6 +190,6 @@ class Student(BaseModel):
 def create_student(student: Student):
     data = load_data()
     
-    data[student.id] = student.model_dump(exclude={"id"}) # convert model to dictionary
+    data[student.id] = student.model_dump(exclude={"id", "grade"}) # convert model to dictionary
     save_data(data)
     return {"message" : "Student created successfully!", "student" : student}

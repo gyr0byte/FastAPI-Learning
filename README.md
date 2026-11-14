@@ -8,8 +8,8 @@ A hands-on FastAPI learning project that progressively demonstrates how to
 build a small REST API with Python. The current API serves student data from a
 local JSON file and covers core FastAPI concepts such as routes, path
 parameters, query parameters, validation, filtering, sorting, and pagination.
-It also includes a standalone introduction to Pydantic data models and
-validation.
+It also uses Pydantic to validate new student request bodies and includes a
+standalone introduction to Pydantic data models and validation.
 
 > This is an educational project, not a production-ready application.
 
@@ -20,6 +20,7 @@ validation.
 - [Requirements](#requirements)
 - [Getting started](#getting-started)
 - [API reference](#api-reference)
+- [Creating students](#creating-students)
 - [Pydantic fundamentals](#pydantic-fundamentals)
 - [Validation and errors](#validation-and-errors)
 - [Interactive documentation](#interactive-documentation)
@@ -36,6 +37,8 @@ validation.
 - Pydantic models with type hints, field constraints, email validation, custom
   validators, computed fields, model-to-dictionary conversion, and validation
   of the repository's JSON data.
+- Student creation through a validated JSON request body.
+- New students persisted to [`students.json`](students.json).
 - Automatic interactive API documentation through Swagger UI and ReDoc.
 - Clear HTTP errors for missing students and invalid sorting options.
 
@@ -98,6 +101,7 @@ http://127.0.0.1:8000
 | `GET` | `/filter?course=Python` | Returns students enrolled in a course. |
 | `GET` | `/sort?sort_by=marks&order=desc` | Sorts students by a supported field and order. |
 | `GET` | `/paginate?page=1&limit=2` | Returns one page of students with metadata. |
+| `POST` | `/create` | Validates and saves a new student. |
 
 ### Sorting
 
@@ -136,7 +140,7 @@ The response contains the requested `page`, the `limit`, the
 {
   "page": 1,
   "limit": 2,
-  "total_students": 7,
+  "total_students": 8,
   "students": [
     {
       "id": "S001",
@@ -165,6 +169,47 @@ GET http://127.0.0.1:8000/student/S001
 GET http://127.0.0.1:8000/filter?course=python
 ```
 
+### Creating students
+
+The `/create` endpoint accepts a JSON request body validated by the `Student`
+Pydantic model. A successful request returns HTTP `201`, saves the student in
+`students.json`, and includes the computed grade in the response.
+
+Example request:
+
+```http
+POST http://127.0.0.1:8000/create
+Content-Type: application/json
+```
+
+```json
+{
+  "id": "S009",
+  "name": "Sarah Wilson",
+  "age": 21,
+  "course": "Python",
+  "marks": 94,
+  "email": "sarah@example.com"
+}
+```
+
+Example response:
+
+```json
+{
+  "message": "Student created successfully!",
+  "student": {
+    "id": "S009",
+    "name": "Sarah Wilson",
+    "age": 21,
+    "course": "Python",
+    "marks": 94,
+    "email": "sarah@example.com",
+    "grade": "A+"
+  }
+}
+```
+
 ## Pydantic fundamentals
 
 [`pydantic_basics.py`](pydantic_basics.py) is a standalone learning module
@@ -189,7 +234,7 @@ Run the lesson directly with:
 uv run python pydantic_basics.py
 ```
 
-The example validates and prints all seven students with their calculated
+The example validates and prints all eight students with their calculated
 grades:
 
 ```text
@@ -200,6 +245,7 @@ S004 Alice Johnson 23 Python 90 alice@example.com A+
 S005 Bob Brown 20 Java 85 bob@example.com A
 S006 Charlie Davis 22 Python 89 charlie@example.com A
 S007 David Evans 21 Java 92 david@example.com A+
+S008 Ava Monroe 22 Python 89 ava@example.com A
 ```
 
 ## Validation and errors
@@ -210,6 +256,11 @@ S007 David Evans 21 Java 92 david@example.com A+
 - `page` values below `1` are rejected by FastAPI validation.
 - `limit` values below `1` or above `100` are rejected by FastAPI validation.
 - A page beyond the available data returns an empty `students` list.
+- Invalid `/create` request bodies return FastAPI validation errors.
+- Student names must contain only letters and spaces.
+- Student ages must be between `1` and `100`, and marks must be between `0`
+  and `100`.
+- Student email addresses must be valid email strings.
 
 ## Interactive documentation
 
@@ -223,7 +274,7 @@ With the server running, FastAPI provides:
 
 Planned topics for future iterations include:
 
-- Integrating the Pydantic models with FastAPI response models
+- Adding richer Pydantic response models to the existing endpoints
 - POST, PUT, and DELETE endpoints
 - Full CRUD operations
 - Database integration with PostgreSQL and SQLAlchemy
