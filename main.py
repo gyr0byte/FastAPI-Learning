@@ -196,3 +196,24 @@ def create_student(student: Student):
     data[student.id] = student.model_dump(exclude={"id", "grade"}) # convert model to dictionary
     save_data(data)
     return {"message" : "Student created successfully!", "student" : student}
+
+
+class StudentUpdate(BaseModel):
+    name    : str | None = Field(None, min_length=2, max_length=50)
+    age     : int | None = Field(None, gt= 0, lt= 100)
+    course  : str | None = Field(None, max_length=50)
+    marks   : int | None = Field(None, ge=0, le=100)
+    email   : EmailStr | None = None
+
+@app.put("/update/{id}")
+def update_student(
+    student_update: StudentUpdate,
+    id: str = Path(..., description="The ID of the student to update", examples=["S001"])
+):
+    data = load_data()
+    
+    if student.id not in data:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Student with id '{id}' not found!"
+        )
