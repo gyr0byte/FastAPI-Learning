@@ -21,10 +21,15 @@ def hello():
     return {"Hello, World!"}
 
 # Loading data from a JSON file 
-
+# Helper Function 1
 def load_data():
     with open('students.json', 'r') as f:
         return json.load(f)
+ 
+# Helper Function 2   
+def save_data(data):
+    with open('students.json', 'w') as f:
+        json.dump(data, f, indent=4) # indent=4 -> to make the JSON file more readable
    
 @app.get("/student") 
 def student():
@@ -182,5 +187,9 @@ class Student(BaseModel):
             return "F"
 
 @app.post("/create", status_code=201)
-def create_student():
+def create_student(student: Student):
+    data = load_data()
     
+    data[student.id] = student.model_dump(exclude={"id"}) # convert model to dictionary
+    save_data(data)
+    return {"message" : "Student created successfully!", "student" : student}
