@@ -1,7 +1,7 @@
 import json
 
 from fastapi import FastAPI, HTTPException, Path, Query
-from pydantic import BaseModel, computed_field, field_validator, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
 
 app = FastAPI()
 
@@ -189,6 +189,9 @@ class Student(BaseModel):
 @app.post("/create", status_code=201)
 def create_student(student: Student):
     data = load_data()
+    
+    if student.id in data:
+        raise HTTPException(status_code=400, detail="Student with this ID already exists")
     
     data[student.id] = student.model_dump(exclude={"id", "grade"}) # convert model to dictionary
     save_data(data)
