@@ -509,7 +509,6 @@ FastAPI-Learning/
 ├── pyproject.toml       # Project configuration: Python version and package dependencies
 ├── LICENSE              # MIT License
 ├── README.md            # Comprehensive learning documentation and API reference
-├── README.old.md        # Backup copy of previous documentation
 ├── assets/
 │   └── banner.svg       # Custom hand-crafted repository header banner
 └── web/
