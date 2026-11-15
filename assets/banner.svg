@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 220" width="100%" height="220" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#161612" />
+      <stop offset="50%" stop-color="#12120f" />
+      <stop offset="100%" stop-color="#0d0d0b" />
+    </linearGradient>
+    <radialGradient id="accentGlow" cx="80%" cy="20%" r="60%">
+      <stop offset="0%" stop-color="#86bfa9" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#86bfa9" stop-opacity="0" />
+    </radialGradient>
+    <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
+      <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#ffffff" stroke-width="1" stroke-opacity="0.03" />
+    </pattern>
+  </defs>
+
+  <!-- Background Base -->
+  <rect width="800" height="220" rx="14" fill="url(#bgGrad)" stroke="#2a2825" stroke-width="1.5" />
+  <rect width="800" height="220" rx="14" fill="url(#grid)" />
+  <rect width="800" height="220" rx="14" fill="url(#accentGlow)" />
+
+  <!-- Accent top border -->
+  <path d="M 14 0 L 786 0" stroke="#86bfa9" stroke-width="3" stroke-opacity="0.8" />
+
+  <!-- Pill Badge -->
+  <g transform="translate(60, 42)">
+    <rect width="118" height="24" rx="12" fill="#1b2823" stroke="#86bfa9" stroke-width="1" />
+    <circle cx="12" cy="12" r="4" fill="#86bfa9" />
+    <text x="24" y="16" fill="#86bfa9" font-family="'Segoe UI', -apple-system, sans-serif" font-size="11" font-weight="600" letter-spacing="1">LEARNING LOG</text>
+  </g>
+
+  <!-- Main Title -->
+  <text x="60" y="112" fill="#ecebe5" font-family="Georgia, 'Times New Roman', serif" font-size="38" font-weight="bold">
+    FastAPI Learning<tspan fill="#86bfa9">.</tspan>
+  </text>
+
+  <!-- Subtitle -->
+  <text x="60" y="148" fill="#9a968c" font-family="'Segoe UI', -apple-system, sans-serif" font-size="15" font-weight="400">
+    A step-by-step journey through FastAPI, Pydantic, and modern API design
+  </text>
+
+  <!-- Code Card on Right -->
+  <g transform="translate(560, 52)">
+    <rect width="180" height="116" rx="8" fill="#181814" stroke="#2a2825" stroke-width="1" />
+    <circle cx="16" cy="16" r="4" fill="#e0846f" opacity="0.8"/>
+    <circle cx="28" cy="16" r="4" fill="#d4a843" opacity="0.8"/>
+    <circle cx="40" cy="16" r="4" fill="#86bfa9" opacity="0.8"/>
+    <text x="16" y="44" fill="#86bfa9" font-family="Consolas, monospace" font-size="12">@app.get("/")</text>
+    <text x="16" y="66" fill="#ecebe5" font-family="Consolas, monospace" font-size="12">def learn():</text>
+    <text x="32" y="88" fill="#9a968c" font-family="Consolas, monospace" font-size="12">return "FastAPI"</text>
+    <text x="16" y="110" fill="#86bfa9" font-family="Consolas, monospace" font-size="12" opacity="0.7"># concepts first</text>
+  </g>
+</svg>
+
