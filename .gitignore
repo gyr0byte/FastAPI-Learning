@@ -30,6 +30,9 @@ htmlcov/
 .tox/
 .nox/
 .hypothesis/
+.uv_cache/
+.uv/
+
 
 # Linters and type checkers
 .mypy_cache/

@@ -303,8 +303,7 @@ header [data-testid="stDeployButton"] {display: none;}
     font-weight: 600;
 }
 
-div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] button[kind="primary"][key="delete_confirm_btn"]) button[kind="primary"],
-div[key="delete_confirm_container"] button[kind="primary"] {
+.st-key-delete_confirm_container button[kind="primary"] {
     background-color: var(--tok-danger) !important;
     border-color: var(--tok-danger) !important;
     color: #ffffff !important;
@@ -663,12 +662,14 @@ def add_student_dialog():
         "marks": new_marks,
     }
 
+    touched = bool(new_name.strip() or new_email.strip() or new_course)
     errors = validate_student_fields(data, is_edit=False, existing_ids=existing_ids)
 
-    for fld, msg in errors.items():
-        st.caption(f"⚠️ **{fld.capitalize()}**: {msg}")
+    if touched:
+        for fld, msg in errors.items():
+            st.caption(f"⚠️ **{fld.capitalize()}**: {msg}")
 
-    can_submit = len(errors) == 0
+    can_submit = touched and len(errors) == 0
 
     if st.button("Create Student", type="primary", disabled=not can_submit, width="stretch"):
         body = {
@@ -1008,7 +1009,7 @@ if all_students_list:
             cnt = grade_counts[g]
             pct = (cnt / total_cnt) * 100 if total_cnt > 0 else 0
             if cnt > 0:
-                seg_html += f'<div class="grade-bar-segment" style="width:{pct}%%;background:{GRADE_COLORS[g]};"></div>'
+                seg_html += f'<div class="grade-bar-segment" style="width:{pct}%;background:{GRADE_COLORS[g]};"></div>'
             legend_html.append(f'{grade_chip_html(g)} <span style="font-size:0.75rem;color:{TOK_MUTED};">{cnt}</span>')
 
         st.markdown(
@@ -1088,6 +1089,7 @@ with tab_roster:
                 default=st.session_state.sort_order,
                 key="sort_order_segmented",
             )
+            order_sel = order_sel or "↑ Asc"
             st.session_state.sort_order = order_sel
 
         with sort_col3:
@@ -1324,8 +1326,8 @@ with tab_roster:
                     f'<div style="font-family:\'Geist\',sans-serif;font-size:0.78rem;color:{TOK_MUTED};font-weight:600;text-transform:uppercase;margin-bottom:6px;">vs Class Average</div>'
                     f'<div style="display:flex;align-items:center;gap:10px;">'
                     f'<div style="flex:1;height:8px;background:{TOK_LINE};border-radius:4px;position:relative;">'
-                    f'<div style="height:100%%;width:{min(s_marks, 100)}%%;background:{ring_color};border-radius:4px;"></div>'
-                    f'<div style="position:absolute;top:-4px;left:{min(class_avg, 100)}%%;width:2px;height:16px;background:{TOK_MUTED};"></div>'
+                    f'<div style="height:100%;width:{min(s_marks, 100)}%;background:{ring_color};border-radius:4px;"></div>'
+                    f'<div style="position:absolute;top:-4px;left:{min(class_avg, 100)}%;width:2px;height:16px;background:{TOK_MUTED};"></div>'
                     f'</div>'
                     f'<span style="font-family:\'Geist Mono\',monospace;font-size:0.84rem;color:{delta_color};font-weight:600;">{delta_str}</span>'
                     f'</div>'
@@ -1387,7 +1389,8 @@ with tab_insights:
             bars = alt.Chart(df_course).mark_bar(cornerRadiusEnd=4).encode(
                 x=alt.X("Average Marks:Q", title="Average Marks", axis=c_axis),
                 y=alt.Y("Course:N", sort="-x", title="", axis=c_axis),
-                color=alt.condition(hover_course, alt.value(TOK_ACCENT), alt.value(TOK_LINE)),
+                color=alt.value(TOK_ACCENT),
+                opacity=alt.condition(hover_course, alt.value(1), alt.value(0.6)),
                 tooltip=["Course", "Average Marks", "Students"],
             ).add_params(hover_course)
 
@@ -1404,7 +1407,7 @@ with tab_insights:
                 height=max(180, len(course_avgs) * 36)
             ).configure_view(strokeWidth=0)
 
-            st.altair_chart(chart1, use_container_width=True)
+            st.altair_chart(chart1, width="stretch")
 
         # ── Chart 2: Grade Distribution ──
         st.markdown(
@@ -1435,7 +1438,7 @@ with tab_insights:
         )
 
         chart2 = (grade_bars + grade_labels).properties(height=260).configure_view(strokeWidth=0)
-        st.altair_chart(chart2, use_container_width=True)
+        st.altair_chart(chart2, width="stretch")
 
         # ── Chart 3: Age vs Marks Scatter Plot ──
         st.markdown(
@@ -1482,7 +1485,7 @@ with tab_insights:
             labelColor=TOK_MUTED,
             titleColor=TOK_MUTED,
         )
-        st.altair_chart(chart3, use_container_width=True)
+        st.altair_chart(chart3, width="stretch")
 
 
 # ─── 3. Activity Tab ────────────────────────────────────────────────────────────

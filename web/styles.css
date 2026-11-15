@@ -100,6 +100,10 @@ body {
   transition: background-color 0.25s ease, color 0.25s ease;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 /* Screen-reader utility */
 .sr-only {
   position: absolute;
