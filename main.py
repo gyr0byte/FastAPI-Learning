@@ -255,3 +255,8 @@ def delete_student(
             status_code=404,
             detail=f"Student with id '{student_id}' not found!"
         )
+        
+    del data[student_id]
+    save_data(data)
+    
+    return {"message" : f"Student with id '{student_id}' deleted successfully!"}
