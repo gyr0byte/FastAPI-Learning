@@ -1,472 +1,669 @@
-/* ============================================================
-   Student Registry — Vanilla JS Client
-   ============================================================ */
+/**
+ * Student Registry — Vanilla HTML/CSS/JS Frontend
+ * No frameworks, no build tools, pure vanilla JavaScript.
+ */
 
-// ── State ────────────────────────────────────────────────────
+// ── Application State ───────────────────────────────────────────
 const state = {
   baseUrl: 'http://127.0.0.1:8000',
-  allStudents: {},
-  students: [],
-  course: '',
-  sortBy: '',
-  order: 'asc',
-  search: '',
-  page: 1,
-  limit: 10,
-  total: 0,
-  connected: false,
-  drawerOpen: false,
-  drawerMode: null,
-  editingStudent: null
+  allStudents: {},     // raw dictionary from GET /student
+  students: [],        // current page list of students
+  course: '',          // active course filter
+  sortBy: '',          // active sort field ('marks' | 'name' | 'age' | '')
+  order: 'asc',        // sort order ('asc' | 'desc')
+  search: '',          // client search query
+  page: 1,             // 1-based page number
+  limit: 10,           // items per page (5, 10, 20, 50)
+  total: 0,            // total matching items for current view
+  connected: false,    // API reachability status
+  drawerOpen: false,   // drawer visibility
+  drawerMode: null,    // 'view' | 'create' | 'edit'
+  editingStudent: null // student object for view/edit
 };
 
-// ── Constants ────────────────────────────────────────────────
-const DOT_COLORS = ['#e07b5a','#d4a843','#7cb87a','#5b9bd5','#9b7cb8','#d47ba0','#5bbab5','#b89b5a'];
-const GRADE_COLORS = { 'A+': '#2d5a4c', 'A': '#3d7a5c', 'B': '#6b7a2d', 'C': '#b8860b', 'F': '#b0412d' };
+// ── Color Palettes & Constants ──────────────────────────────────
+const DOT_COLORS = [
+  '#e07b5a', '#d4a843', '#7cb87a', '#5b9bd5',
+  '#9b7cb8', '#d47ba0', '#5bbab5', '#b89b5a'
+];
 
-// ── Helpers ──────────────────────────────────────────────────
+const GRADE_COLORS = {
+  'A+': '#2d5a4c',
+  'A':  '#3d7a5c',
+  'B':  '#6b7a2d',
+  'C':  '#b8860b',
+  'F':  '#b0412d'
+};
+
+const GRADE_CLASS_MAP = {
+  'A+': 'a-plus',
+  'A':  'a',
+  'B':  'b',
+  'C':  'c',
+  'F':  'f'
+};
+
+// ── Security Helper: HTML Escaping ──────────────────────────────
+/**
+ * Escapes unsafe characters before injecting user content into innerHTML.
+ */
 function esc(str) {
   if (str === null || str === undefined) return '';
-  var s = String(str);
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
+// ── Grade Computation ───────────────────────────────────────────
 function computeGrade(marks) {
-  if (marks >= 90) return 'A+';
-  if (marks >= 80) return 'A';
-  if (marks >= 70) return 'B';
-  if (marks >= 60) return 'C';
+  const m = Number(marks);
+  if (m >= 90) return 'A+';
+  if (m >= 80) return 'A';
+  if (m >= 70) return 'B';
+  if (m >= 60) return 'C';
   return 'F';
 }
 
-function getSortedCourses() {
-  var courses = [];
-  var seen = {};
-  for (var id in state.allStudents) {
-    var c = state.allStudents[id].course;
-    if (c && !seen[c]) { seen[c] = true; courses.push(c); }
-  }
-  courses.sort(function(a, b) { return a.localeCompare(b); });
-  return courses;
-}
-
-function courseColor(course) {
-  var list = getSortedCourses();
-  var idx = list.indexOf(course);
-  if (idx === -1) idx = 0;
-  return DOT_COLORS[idx % DOT_COLORS.length];
-}
-
 function gradeChipHTML(grade) {
-  var bg = GRADE_COLORS[grade] || '#666';
-  return '<span class="grade-chip" style="background:' + bg + '22;color:' + bg + ';border:1px solid ' + bg + '44">' + esc(grade) + '</span>';
+  const cls = GRADE_CLASS_MAP[grade] || 'f';
+  return `<span class="grade-chip ${cls}">${esc(grade)}</span>`;
 }
 
-function nextId() {
-  var max = 0;
-  for (var id in state.allStudents) {
-    var m = id.match(/^S(\d+)$/);
-    if (m) { var n = parseInt(m[1], 10); if (n > max) max = n; }
+// ── Course Palette Assignment ───────────────────────────────────
+function getUniqueSortedCourses() {
+  const courses = new Set();
+  for (const id in state.allStudents) {
+    const c = state.allStudents[id].course;
+    if (c) courses.add(c);
   }
-  var next = max + 1;
-  return 'S' + String(next).padStart(3, '0');
+  return Array.from(courses).sort((a, b) => a.localeCompare(b));
 }
 
-// ── localStorage ─────────────────────────────────────────────
-function lsGet(key) { try { return localStorage.getItem(key); } catch(e) { return null; } }
-function lsSet(key, val) { try { localStorage.setItem(key, val); } catch(e) {} }
+function getCourseDotColor(course) {
+  const sorted = getUniqueSortedCourses();
+  const idx = sorted.indexOf(course);
+  return DOT_COLORS[(idx >= 0 ? idx : 0) % DOT_COLORS.length];
+}
 
-function loadPrefs() {
-  var url = lsGet('sr_baseUrl');
-  if (url) state.baseUrl = url;
-  var lim = lsGet('sr_limit');
-  if (lim) state.limit = parseInt(lim, 10) || 10;
-  var theme = lsGet('sr_theme');
-  if (theme) {
-    document.documentElement.setAttribute('data-theme', theme);
+// ── Next ID Suggestion ──────────────────────────────────────────
+function suggestNextId() {
+  let maxNum = 0;
+  for (const id in state.allStudents) {
+    const match = id.match(/^S(\d+)$/i);
+    if (match) {
+      const num = parseInt(match[1], 10);
+      if (num > maxNum) maxNum = num;
+    }
+  }
+  return `S${String(maxNum + 1).padStart(3, '0')}`;
+}
+
+// ── Class Average Calculation ───────────────────────────────────
+function getClassAverage() {
+  const ids = Object.keys(state.allStudents);
+  if (ids.length === 0) return 0;
+  const sum = ids.reduce((acc, id) => acc + (state.allStudents[id].marks || 0), 0);
+  return sum / ids.length;
+}
+
+// ── localStorage Persistence ────────────────────────────────────
+function lsGet(key) {
+  try { return localStorage.getItem(key); } catch (e) { return null; }
+}
+
+function lsSet(key, val) {
+  try { localStorage.setItem(key, val); } catch (e) { /* ignore */ }
+}
+
+function loadPreferences() {
+  const savedUrl = lsGet('sr_baseUrl');
+  if (savedUrl) state.baseUrl = savedUrl;
+
+  const savedLimit = lsGet('sr_limit');
+  if (savedLimit) state.limit = parseInt(savedLimit, 10) || 10;
+
+  const savedTheme = lsGet('sr_theme');
+  if (savedTheme) {
+    document.documentElement.setAttribute('data-theme', savedTheme);
   } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     document.documentElement.setAttribute('data-theme', 'dark');
   }
-  updateThemeIcon();
+  updateThemeButton();
 }
 
-function saveBaseUrl() { lsSet('sr_baseUrl', state.baseUrl); }
-function saveLimit()   { lsSet('sr_limit', String(state.limit)); }
-function saveTheme()   { lsSet('sr_theme', document.documentElement.getAttribute('data-theme') || 'light'); }
-
-// ── ApiError ─────────────────────────────────────────────────
-function ApiError(status, message, fields) {
-  this.status = status;
-  this.message = message;
-  this.fields = fields || {};
+function savePreferences() {
+  lsSet('sr_baseUrl', state.baseUrl);
+  lsSet('sr_limit', String(state.limit));
+  lsSet('sr_theme', document.documentElement.getAttribute('data-theme') || 'light');
 }
-ApiError.prototype = Object.create(Error.prototype);
-ApiError.prototype.constructor = ApiError;
 
-// ── api() wrapper ────────────────────────────────────────────
-function api(method, path, body) {
-  var url = state.baseUrl + path;
-  var reqLine = document.getElementById('request-line');
-  var opts = { method: method, headers: {} };
-  if (body !== undefined) {
-    opts.headers['Content-Type'] = 'application/json';
-    opts.body = JSON.stringify(body);
+// ── Custom API Error Class ──────────────────────────────────────
+class ApiError extends Error {
+  constructor(status, message, fields = {}) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.fields = fields; // { fieldName: errorMsg }
+  }
+}
+
+// ── Unified HTTP API Helper ─────────────────────────────────────
+async function api(method, path, body = null) {
+  const cleanBase = state.baseUrl.replace(/\/+$/, '');
+  const url = `${cleanBase}${path}`;
+  const t0 = performance.now();
+
+  const reqMethodEl = document.getElementById('req-method');
+  const reqPathEl = document.getElementById('req-path');
+  const reqStatusEl = document.getElementById('req-status');
+
+  const headers = {};
+  const options = { method, headers };
+
+  if (body !== null && body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    options.body = JSON.stringify(body);
   }
 
-  var methodColors = { GET: '#5b9bd5', POST: '#7cb87a', PUT: '#d4a843', DELETE: '#e07b5a' };
-  var t0 = performance.now();
+  try {
+    const res = await fetch(url, options);
+    const elapsed = Math.round(performance.now() - t0);
 
-  return fetch(url, opts).then(function(resp) {
-    var elapsed = Math.round(performance.now() - t0);
-    if (reqLine) {
-      reqLine.innerHTML = '<span style="color:' + (methodColors[method] || '#ccc') + ';font-weight:700">' + method + '</span> ' +
-        esc(path) + ' <span style="opacity:.6">' + resp.status + ' · ' + elapsed + ' ms</span>';
+    // Update Request Line
+    if (reqMethodEl) {
+      reqMethodEl.textContent = method;
+      reqMethodEl.className = `req-method ${method.toLowerCase()}`;
     }
-    setConnected(true);
+    if (reqPathEl) {
+      reqPathEl.textContent = path;
+    }
+    if (reqStatusEl) {
+      reqStatusEl.textContent = `${res.status} · ${elapsed} ms`;
+      reqStatusEl.className = res.ok ? 'req-status status-ok' : 'req-status status-err';
+    }
 
-    return resp.text().then(function(text) {
-      var data;
-      try { data = JSON.parse(text); } catch(e) { data = text; }
+    setConnectionStatus(true);
 
-      if (!resp.ok) {
-        var fields = {};
-        var msg = '';
-        if (resp.status === 422 && data && Array.isArray(data.detail)) {
-          data.detail.forEach(function(err) {
-            var field = Array.isArray(err.loc) && err.loc.length > 0 ? err.loc[err.loc.length - 1] : 'general';
-            var m = (err.msg || '').replace(/^Value error, /i, '');
-            fields[field] = m;
-          });
-          msg = 'Validation failed';
-        } else if (data && typeof data.detail === 'string') {
-          msg = data.detail;
-        } else {
-          msg = 'Request failed (' + resp.status + ')';
-        }
-        throw new ApiError(resp.status, msg, fields);
+    const text = await res.text();
+    let data;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (e) {
+      data = text;
+    }
+
+    if (!res.ok) {
+      const fields = {};
+      let msg = 'Request failed';
+
+      if (res.status === 422 && data && Array.isArray(data.detail)) {
+        // FastAPI 422 format: [{ loc: [..., "fieldName"], msg: "Value error, ..." }]
+        data.detail.forEach(err => {
+          const field = Array.isArray(err.loc) && err.loc.length > 0
+            ? err.loc[err.loc.length - 1]
+            : 'general';
+          const cleanMsg = (err.msg || '').replace(/^Value error,\s*/i, '');
+          fields[field] = cleanMsg;
+        });
+        msg = Object.values(fields).join('; ');
+      } else if (data && typeof data.detail === 'string') {
+        msg = data.detail;
+      } else if (typeof data === 'string') {
+        msg = data;
       }
-      return data;
-    });
-  }).catch(function(err) {
-    if (err instanceof ApiError) throw err;
-    var elapsed = Math.round(performance.now() - t0);
-    if (reqLine) {
-      reqLine.innerHTML = '<span style="color:#e07b5a;font-weight:700">' + method + '</span> ' +
-        esc(path) + ' <span style="color:#e07b5a">ERR · ' + elapsed + ' ms</span>';
+
+      throw new ApiError(res.status, msg, fields);
     }
-    setConnected(false);
-    throw new ApiError(0, "Can't reach the API. Is `uvicorn main:app --reload` running?", {});
-  });
+
+    return data;
+  } catch (err) {
+    const elapsed = Math.round(performance.now() - t0);
+
+    if (err instanceof ApiError) {
+      throw err;
+    }
+
+    // Network / timeout error
+    if (reqMethodEl) {
+      reqMethodEl.textContent = method;
+      reqMethodEl.className = `req-method ${method.toLowerCase()}`;
+    }
+    if (reqPathEl) reqPathEl.textContent = path;
+    if (reqStatusEl) {
+      reqStatusEl.textContent = `ERR · ${elapsed} ms`;
+      reqStatusEl.className = 'req-status status-err';
+    }
+
+    setConnectionStatus(false);
+    throw new ApiError(
+      0,
+      "Can't reach the API. Is `uvicorn main:app --reload` running?"
+    );
+  }
 }
 
-// ── Connection ───────────────────────────────────────────────
-function setConnected(val) {
-  state.connected = val;
-  var dot = document.getElementById('conn-dot');
-  var text = document.getElementById('conn-text');
-  var reconnect = document.getElementById('btn-reconnect');
-  var newBtn = document.getElementById('btn-new');
-  if (dot) dot.className = 'conn-dot ' + (val ? 'conn-ok' : 'conn-fail');
-  if (text) text.textContent = val ? 'Connected' : 'Disconnected';
-  if (reconnect) reconnect.style.display = val ? 'none' : 'inline-flex';
-  if (newBtn) newBtn.disabled = !val;
+// ── Connection Status ───────────────────────────────────────────
+function setConnectionStatus(connected) {
+  state.connected = connected;
+  const dot = document.getElementById('connection-dot');
+  const newBtn = document.getElementById('btn-new-student');
+
+  if (dot) {
+    dot.className = `connection-dot ${connected ? 'online' : 'offline'}`;
+    dot.title = connected ? 'API Connected' : 'API Offline';
+  }
+  if (newBtn) {
+    newBtn.disabled = !connected;
+  }
 }
 
-// ── Toast ────────────────────────────────────────────────────
-function toast(message, type, statusCode) {
-  var container = document.getElementById('toasts');
+// ── Toast Notifications ─────────────────────────────────────────
+function showToast(message, type = 'success', statusCode = null) {
+  const container = document.getElementById('toast-container');
   if (!container) return;
-  var el = document.createElement('div');
-  el.className = 'toast toast-' + (type || 'success');
-  var prefix = '';
-  if (statusCode) prefix = '<span class="toast-code">' + statusCode + '</span> ';
-  el.innerHTML = prefix + esc(message);
-  container.appendChild(el);
-  requestAnimationFrame(function() { el.classList.add('toast-show'); });
-  setTimeout(function() {
-    el.classList.remove('toast-show');
-    el.classList.add('toast-hide');
-    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 350);
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type === 'error' ? 'error' : ''}`;
+
+  const codePrefix = statusCode ? `<strong>[${statusCode}]</strong> ` : '';
+  toast.innerHTML = `${codePrefix}${esc(message)}`;
+
+  container.appendChild(toast);
+
+  // Auto-dismiss after 4 seconds
+  setTimeout(() => {
+    toast.classList.add('toast-hide');
+    setTimeout(() => {
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 250);
   }, 4000);
 }
 
-// ── Theme ────────────────────────────────────────────────────
+// ── Theme Management ────────────────────────────────────────────
 function toggleTheme() {
-  var current = document.documentElement.getAttribute('data-theme');
-  var next = current === 'dark' ? 'light' : 'dark';
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
-  updateThemeIcon();
-  saveTheme();
+  updateThemeButton();
+  savePreferences();
 }
 
-function updateThemeIcon() {
-  var btn = document.getElementById('btn-theme');
+function updateThemeButton() {
+  const btn = document.getElementById('btn-theme');
   if (!btn) return;
-  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
   btn.textContent = isDark ? '☀' : '☽';
+  btn.title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
 }
 
-// ── Stats ────────────────────────────────────────────────────
+// ── Stat Cards Rendering ────────────────────────────────────────
 function renderStats() {
-  var container = document.getElementById('stats');
-  if (!container) return;
+  const ids = Object.keys(state.allStudents);
+  const total = ids.length;
+  const courses = getUniqueSortedCourses();
 
-  var ids = Object.keys(state.allStudents);
-  var count = ids.length;
-  var courses = getSortedCourses();
-  var totalMarks = 0;
-  var passing = 0;
-  var topName = '';
-  var topMarks = -1;
-  var topCourse = '';
-  var grades = { 'A+': 0, 'A': 0, 'B': 0, 'C': 0, 'F': 0 };
+  // 1. Students count
+  const countEl = document.getElementById('stat-students-count');
+  const countSubEl = document.getElementById('stat-students-sub');
+  if (countEl) countEl.textContent = total;
+  if (countSubEl) countSubEl.textContent = `across ${courses.length} course${courses.length !== 1 ? 's' : ''}`;
 
-  ids.forEach(function(id) {
-    var s = state.allStudents[id];
-    totalMarks += s.marks;
-    if (s.marks >= 60) passing++;
-    if (s.marks > topMarks) { topMarks = s.marks; topName = s.name; topCourse = s.course; }
-    var g = computeGrade(s.marks);
-    grades[g] = (grades[g] || 0) + 1;
-  });
-
-  var avg = count ? (totalMarks / count).toFixed(1) : '0';
-
-  // Grade bar segments
-  var barParts = '';
-  var legendParts = '';
-  var gradeOrder = ['A+', 'A', 'B', 'C', 'F'];
-  gradeOrder.forEach(function(g) {
-    var pct = count ? (grades[g] / count * 100) : 0;
-    if (pct > 0) {
-      barParts += '<div class="grade-bar-seg" style="width:' + pct + '%;background:' + GRADE_COLORS[g] + '" title="' + g + ': ' + grades[g] + '"></div>';
-    }
-    legendParts += '<span class="grade-legend-item"><span class="grade-legend-dot" style="background:' + GRADE_COLORS[g] + '"></span>' + g + ' <span class="dim">' + grades[g] + '</span></span>';
-  });
-
-  container.innerHTML =
-    '<div class="stat-card">' +
-      '<div class="stat-value">' + count + '</div>' +
-      '<div class="stat-label">Students <span class="dim">across ' + courses.length + ' courses</span></div>' +
-    '</div>' +
-    '<div class="stat-card">' +
-      '<div class="stat-value">' + esc(avg) + '</div>' +
-      '<div class="stat-label">Class average <span class="dim">' + passing + ' of ' + count + ' passing (≥60)</span></div>' +
-    '</div>' +
-    '<div class="stat-card">' +
-      '<div class="stat-value">' + (count ? esc(String(topMarks)) : '—') + '</div>' +
-      '<div class="stat-label">Top scorer <span class="dim">' + esc(topName) + (topCourse ? ' · ' + esc(topCourse) : '') + '</span></div>' +
-    '</div>' +
-    '<div class="stat-card stat-card-wide">' +
-      '<div class="grade-bar">' + barParts + '</div>' +
-      '<div class="grade-legend">' + legendParts + '</div>' +
-    '</div>';
-}
-
-// ── Course filter dropdown ───────────────────────────────────
-function renderCourseFilter() {
-  var sel = document.getElementById('sel-course');
-  if (!sel) return;
-  var courses = getSortedCourses();
-  var html = '<option value="">All courses</option>';
-  courses.forEach(function(c) {
-    html += '<option value="' + esc(c) + '"' + (state.course === c ? ' selected' : '') + '>' + esc(c) + '</option>';
-  });
-  sel.innerHTML = html;
-}
-
-// ── Datalist for course input ────────────────────────────────
-function renderCourseDatalist() {
-  var dl = document.getElementById('courses-list');
-  if (!dl) return;
-  var courses = getSortedCourses();
-  dl.innerHTML = '';
-  courses.forEach(function(c) {
-    var opt = document.createElement('option');
-    opt.value = c;
-    dl.appendChild(opt);
-  });
-}
-
-// ── Skeleton ─────────────────────────────────────────────────
-function renderSkeleton() {
-  var tbody = document.getElementById('student-tbody');
-  if (!tbody) return;
-  var html = '';
-  for (var i = 0; i < 5; i++) {
-    html += '<tr class="skeleton-row">';
-    for (var j = 0; j < 8; j++) {
-      html += '<td><div class="skeleton-cell"></div></td>';
-    }
-    html += '</tr>';
-  }
-  tbody.innerHTML = html;
-}
-
-// ── Table ────────────────────────────────────────────────────
-function renderTable() {
-  var tbody = document.getElementById('student-tbody');
-  if (!tbody) return;
-
-  if (state.students.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="empty-msg">No students found</td></tr>';
+  if (total === 0) {
+    document.getElementById('stat-avg-marks').textContent = '—';
+    document.getElementById('stat-avg-sub').textContent = '0 of 0 passing (60+)';
+    document.getElementById('stat-top-marks').textContent = '—';
+    document.getElementById('stat-top-sub').textContent = '—';
+    document.getElementById('stat-grade-bar').innerHTML = '';
+    document.getElementById('stat-grade-legend').innerHTML = '';
     return;
   }
 
-  var html = '';
-  state.students.forEach(function(s) {
-    var grade = computeGrade(s.marks);
-    var cc = courseColor(s.course);
-    html += '<tr class="student-row" data-id="' + esc(s.id) + '" tabindex="0">' +
-      '<td class="col-id mono">' + esc(s.id) + '</td>' +
-      '<td class="col-name">' + esc(s.name) + '</td>' +
-      '<td class="col-course"><span class="course-dot" style="background:' + cc + '"></span>' + esc(s.course) + '</td>' +
-      '<td class="col-age">' + esc(String(s.age)) + '</td>' +
-      '<td class="col-marks"><div class="marks-bar-wrap"><div class="marks-bar" style="width:' + s.marks + '%;background:' + GRADE_COLORS[grade] + '"></div></div><span class="marks-num">' + s.marks + '</span></td>' +
-      '<td class="col-grade">' + gradeChipHTML(grade) + '</td>' +
-      '<td class="col-email">' + esc(s.email) + '</td>' +
-      '<td class="col-actions"><button class="btn-icon btn-edit" data-id="' + esc(s.id) + '" title="Edit">✎</button><button class="btn-icon btn-delete" data-id="' + esc(s.id) + '" title="Delete">🗑</button></td>' +
-      '</tr>';
+  // 2. Class Average
+  let sumMarks = 0;
+  let passing = 0;
+  let topStudent = null;
+  const gradeCounts = { 'A+': 0, 'A': 0, 'B': 0, 'C': 0, 'F': 0 };
+
+  ids.forEach(id => {
+    const s = state.allStudents[id];
+    const m = s.marks || 0;
+    sumMarks += m;
+    if (m >= 60) passing++;
+
+    if (!topStudent || m > topStudent.marks) {
+      topStudent = { id, ...s };
+    }
+
+    const g = computeGrade(m);
+    gradeCounts[g] = (gradeCounts[g] || 0) + 1;
   });
+
+  const avg = (sumMarks / total).toFixed(1);
+  const avgEl = document.getElementById('stat-avg-marks');
+  const avgSubEl = document.getElementById('stat-avg-sub');
+  if (avgEl) avgEl.textContent = avg;
+  if (avgSubEl) avgSubEl.textContent = `${passing} of ${total} passing (60+)`;
+
+  // 3. Top Scorer
+  const topMarksEl = document.getElementById('stat-top-marks');
+  const topSubEl = document.getElementById('stat-top-sub');
+  if (topMarksEl && topStudent) topMarksEl.textContent = topStudent.marks;
+  if (topSubEl && topStudent) {
+    topSubEl.textContent = `${topStudent.name} · ${topStudent.course}`;
+  }
+
+  // 4. Grade Spread Bar & Legend
+  const barEl = document.getElementById('stat-grade-bar');
+  const legendEl = document.getElementById('stat-grade-legend');
+  if (barEl && legendEl) {
+    let barHTML = '';
+    let legendHTML = '';
+
+    ['A+', 'A', 'B', 'C', 'F'].forEach(grade => {
+      const cnt = gradeCounts[grade] || 0;
+      const pct = (cnt / total) * 100;
+      const color = GRADE_COLORS[grade];
+
+      if (cnt > 0) {
+        barHTML += `<div class="grade-bar-segment" style="width:${pct}%;background:${color};" title="${grade}: ${cnt}"></div>`;
+      }
+      legendHTML += `
+        <span class="grade-legend-item">
+          <span class="grade-legend-dot" style="background:${color};"></span>
+          ${grade} <span class="mono">${cnt}</span>
+        </span>
+      `;
+    });
+
+    barEl.innerHTML = barHTML;
+    legendEl.innerHTML = legendHTML;
+  }
+}
+
+// ── Course Dropdown & Datalist ──────────────────────────────────
+function renderCourseOptions() {
+  const select = document.getElementById('filter-course');
+  const datalist = document.getElementById('course-datalist');
+  const courses = getUniqueSortedCourses();
+
+  if (select) {
+    const curVal = state.course;
+    let html = '<option value="">All Courses</option>';
+    courses.forEach(c => {
+      const sel = c === curVal ? 'selected' : '';
+      html += `<option value="${esc(c)}" ${sel}>${esc(c)}</option>`;
+    });
+    select.innerHTML = html;
+  }
+
+  if (datalist) {
+    let dlHtml = '';
+    courses.forEach(c => {
+      dlHtml += `<option value="${esc(c)}"></option>`;
+    });
+    datalist.innerHTML = dlHtml;
+  }
+}
+
+// ── Skeleton Loading ────────────────────────────────────────────
+function renderSkeletonTable() {
+  const tbody = document.getElementById('students-tbody');
+  if (!tbody) return;
+
+  let html = '';
+  for (let i = 0; i < 5; i++) {
+    html += `
+      <tr>
+        <td><div class="skeleton-cell" style="width: 45px;"></div></td>
+        <td><div class="skeleton-cell" style="width: 140px;"></div></td>
+        <td><div class="skeleton-cell" style="width: 90px;"></div></td>
+        <td><div class="skeleton-cell" style="width: 30px;"></div></td>
+        <td><div class="skeleton-cell" style="width: 110px;"></div></td>
+        <td><div class="skeleton-cell" style="width: 45px;"></div></td>
+        <td><div class="skeleton-cell" style="width: 160px;"></div></td>
+        <td><div class="skeleton-cell" style="width: 40px;"></div></td>
+      </tr>
+    `;
+  }
   tbody.innerHTML = html;
 }
 
-// ── Pagination ───────────────────────────────────────────────
-function renderPagination() {
-  var wrap = document.getElementById('pagination');
-  if (!wrap) return;
-  var totalPages = Math.max(1, Math.ceil(state.total / state.limit));
-  var start = (state.page - 1) * state.limit + 1;
-  var end = Math.min(state.page * state.limit, state.total);
-  if (state.total === 0) { start = 0; end = 0; }
+// ── Render Students Table ───────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('students-tbody');
+  if (!tbody) return;
 
-  wrap.innerHTML =
-    '<button id="btn-prev" class="btn btn-sm"' + (state.page <= 1 ? ' disabled' : '') + '>← Prev</button>' +
-    '<span class="page-info">' + start + '–' + end + ' of ' + state.total + '</span>' +
-    '<button id="btn-next" class="btn btn-sm"' + (state.page >= totalPages ? ' disabled' : '') + '>Next →</button>';
+  if (state.students.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="8" style="text-align: center; padding: 40px 20px; color: var(--muted);">
+          No students found matching your criteria.
+        </td>
+      </tr>
+    `;
+    renderPager();
+    return;
+  }
 
-  document.getElementById('btn-prev').addEventListener('click', function() {
-    if (state.page > 1) { state.page--; loadData(); }
+  let html = '';
+  state.students.forEach(s => {
+    const grade = computeGrade(s.marks);
+    const dotColor = getCourseDotColor(s.course);
+    const marksPct = Math.min(Math.max(s.marks || 0, 0), 100);
+
+    html += `
+      <tr class="student-row" data-id="${esc(s.id)}" tabindex="0" role="button" aria-label="View student ${esc(s.name)}">
+        <td class="td-id">${esc(s.id)}</td>
+        <td class="td-name">${esc(s.name)}</td>
+        <td class="td-course">
+          <span class="course-dot" style="background-color: ${dotColor};"></span>${esc(s.course)}
+        </td>
+        <td class="td-age">${esc(s.age)}</td>
+        <td class="td-marks">
+          <div class="marks-cell">
+            <div class="marks-mini-bar">
+              <div class="marks-mini-fill" style="width: ${marksPct}%;"></div>
+            </div>
+            <span class="marks-mini-val">${esc(s.marks)}</span>
+          </div>
+        </td>
+        <td class="td-grade">${gradeChipHTML(grade)}</td>
+        <td class="td-email">${esc(s.email)}</td>
+        <td class="td-actions">
+          <div class="row-actions">
+            <button
+              type="button"
+              class="btn-action action-edit"
+              data-id="${esc(s.id)}"
+              title="Edit student"
+              aria-label="Edit student ${esc(s.name)}"
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              class="btn-action action-del"
+              data-id="${esc(s.id)}"
+              title="Delete student"
+              aria-label="Delete student ${esc(s.name)}"
+            >
+              🗑
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
   });
-  document.getElementById('btn-next').addEventListener('click', function() {
-    if (state.page < totalPages) { state.page++; loadData(); }
-  });
+
+  tbody.innerHTML = html;
+  renderPager();
 }
 
-// ── Search filter (client-side) ──────────────────────────────
-function applySearch(list) {
-  if (!state.search) return list;
-  var q = state.search.toLowerCase();
-  return list.filter(function(s) {
-    return s.name.toLowerCase().indexOf(q) !== -1 ||
-           s.email.toLowerCase().indexOf(q) !== -1 ||
-           s.id.toLowerCase().indexOf(q) !== -1;
-  });
+// ── Pager Controls ──────────────────────────────────────────────
+function renderPager() {
+  const pagerInfo = document.getElementById('pager-info');
+  const prevBtn = document.getElementById('btn-prev-page');
+  const nextBtn = document.getElementById('btn-next-page');
+
+  const totalPages = Math.max(1, Math.ceil(state.total / state.limit));
+  const start = state.total === 0 ? 0 : (state.page - 1) * state.limit + 1;
+  const end = Math.min(state.page * state.limit, state.total);
+
+  if (pagerInfo) {
+    pagerInfo.textContent = `${start}–${end} of ${state.total} · page ${state.page} of ${totalPages}`;
+  }
+
+  if (prevBtn) prevBtn.disabled = state.page <= 1;
+  if (nextBtn) nextBtn.disabled = state.page >= totalPages;
 }
 
-// ── Local pagination ─────────────────────────────────────────
-function paginateLocal(list) {
-  state.total = list.length;
-  var start = (state.page - 1) * state.limit;
-  return list.slice(start, start + state.limit);
+// ── Local Search & Sort Helpers ─────────────────────────────────
+function applyLocalSearch(list) {
+  if (!state.search.trim()) return list;
+  const q = state.search.trim().toLowerCase();
+  return list.filter(s =>
+    (s.name && s.name.toLowerCase().includes(q)) ||
+    (s.email && s.email.toLowerCase().includes(q)) ||
+    (s.id && s.id.toLowerCase().includes(q))
+  );
 }
 
-// ── Sort locally ─────────────────────────────────────────────
-function sortLocal(list) {
-  if (!state.sortBy) return list;
-  var key = state.sortBy;
-  var asc = state.order === 'asc';
-  var copy = list.slice();
-  copy.sort(function(a, b) {
-    var va = a[key], vb = b[key];
-    if (typeof va === 'string') {
-      va = va.toLowerCase(); vb = vb.toLowerCase();
-    }
-    if (va < vb) return asc ? -1 : 1;
-    if (va > vb) return asc ? 1 : -1;
+function applyLocalSort(list, field, order) {
+  if (!field) return list;
+  const isDesc = order === 'desc';
+  return [...list].sort((a, b) => {
+    let va = a[field];
+    let vb = b[field];
+
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+
+    if (va < vb) return isDesc ? 1 : -1;
+    if (va > vb) return isDesc ? -1 : 1;
     return 0;
   });
-  return copy;
 }
 
-// ── Dict → list ──────────────────────────────────────────────
 function dictToList(dict) {
-  var list = [];
-  for (var id in dict) {
-    var s = Object.assign({}, dict[id], { id: id });
-    list.push(s);
+  const res = [];
+  for (const id in dict) {
+    res.push({ ...dict[id], id });
   }
-  return list;
+  return res;
 }
 
-// ── Data Loading ─────────────────────────────────────────────
-function loadData() {
-  renderSkeleton();
+// ── Data-Loading Logic ──────────────────────────────────────────
+/**
+ * 1. Course selected → GET /filter?course=X (dict → list; sort locally if chosen), paginate locally.
+ * 2. Sort field chosen (no course) → GET /sort?sort_by=X&order=Y, paginate locally.
+ * 3. Neither → GET /paginate (server-side).
+ * Always load GET /student for stats, course list, and next-ID suggestions.
+ */
+async function loadData() {
+  renderSkeletonTable();
 
-  api('GET', '/student').then(function(all) {
+  try {
+    // 1. Fetch complete records for stats, course list, next-ID
+    const all = await api('GET', '/student');
     state.allStudents = all;
     renderStats();
-    renderCourseFilter();
-    renderCourseDatalist();
+    renderCourseOptions();
 
-    // Determine source
+    let list = [];
+
     if (state.course) {
-      return api('GET', '/filter?course=' + encodeURIComponent(state.course)).then(function(dict) {
-        var list = dictToList(dict);
-        if (state.sortBy) list = sortLocal(list);
-        return list;
-      });
+      // 1. Course selected -> GET /filter
+      const filteredDict = await api('GET', `/filter?course=${encodeURIComponent(state.course)}`);
+      list = dictToList(filteredDict);
+
+      // Local sort if sort chosen
+      if (state.sortBy) {
+        list = applyLocalSort(list, state.sortBy, state.order);
+      }
+
+      // Local search
+      list = applyLocalSearch(list);
+      state.total = list.length;
+
+      // Local pagination
+      const totalPages = Math.max(1, Math.ceil(state.total / state.limit));
+      if (state.page > totalPages) state.page = totalPages;
+      const start = (state.page - 1) * state.limit;
+      state.students = list.slice(start, start + state.limit);
+
     } else if (state.sortBy) {
-      return api('GET', '/sort?sort_by=' + encodeURIComponent(state.sortBy) + '&order=' + encodeURIComponent(state.order)).then(function(list) {
-        return list;
-      });
+      // 2. Sort field chosen (no course) -> GET /sort
+      list = await api('GET', `/sort?sort_by=${encodeURIComponent(state.sortBy)}&order=${encodeURIComponent(state.order)}`);
+
+      // Local search
+      list = applyLocalSearch(list);
+      state.total = list.length;
+
+      // Local pagination
+      const totalPages = Math.max(1, Math.ceil(state.total / state.limit));
+      if (state.page > totalPages) state.page = totalPages;
+      const start = (state.page - 1) * state.limit;
+      state.students = list.slice(start, start + state.limit);
+
     } else {
-      return api('GET', '/paginate?page=' + state.page + '&limit=' + state.limit).then(function(data) {
-        state.total = data.total_students;
-        var list = applySearch(data.students);
-        if (list.length !== data.students.length) {
-          // when search narrows results, re-paginate locally over all
-          return api('GET', '/student').then(function(allDict) {
-            var fullList = dictToList(allDict);
-            fullList = applySearch(fullList);
-            state.students = paginateLocal(fullList);
-            renderTable();
-            renderPagination();
-            return null;
-          });
-        }
-        state.students = list;
-        renderTable();
-        renderPagination();
-        return null;
-      });
+      // 3. Neither -> Server-side pagination via GET /paginate
+      if (state.search.trim()) {
+        // When client searches without course/sort, filter over allStudents
+        let fullList = dictToList(state.allStudents);
+        fullList = applyLocalSearch(fullList);
+        state.total = fullList.length;
+
+        const totalPages = Math.max(1, Math.ceil(state.total / state.limit));
+        if (state.page > totalPages) state.page = totalPages;
+        const start = (state.page - 1) * state.limit;
+        state.students = fullList.slice(start, start + state.limit);
+      } else {
+        const pagData = await api('GET', `/paginate?page=${state.page}&limit=${state.limit}`);
+        state.total = pagData.total_students || 0;
+        state.students = pagData.students || [];
+      }
     }
-  }).then(function(list) {
-    if (list === null || list === undefined) return;
-    // local pagination path (filter / sort)
-    list = applySearch(list);
-    state.students = paginateLocal(list);
+
     renderTable();
-    renderPagination();
-  }).catch(function(err) {
-    toast(err.message, 'error', err.status || undefined);
-  });
+  } catch (err) {
+    showToast(err.message, 'error', err.status || null);
+    renderTable();
+  }
 }
 
-// ── Drawer ───────────────────────────────────────────────────
-function openDrawer(mode, student) {
+// ── Drawer Management ───────────────────────────────────────────
+function openDrawer(mode, student = null) {
   state.drawerOpen = true;
   state.drawerMode = mode;
-  state.editingStudent = student || null;
+  state.editingStudent = student ? { ...student } : null;
 
-  var drawer = document.getElementById('drawer');
-  var scrim = document.getElementById('scrim');
-  if (!drawer || !scrim) return;
+  const drawer = document.getElementById('drawer');
+  const scrim = document.getElementById('drawer-scrim');
+  const viewSection = document.getElementById('drawer-view');
+  const formSection = document.getElementById('student-form');
+  const title = document.getElementById('drawer-title');
 
-  drawer.classList.add('open');
-  scrim.classList.add('open');
+  if (drawer) {
+    drawer.classList.add('open');
+    drawer.setAttribute('aria-hidden', 'false');
+  }
+  if (scrim) scrim.classList.add('open');
 
-  renderDrawer();
+  if (mode === 'view' && student) {
+    if (title) title.textContent = 'Student Profile';
+    if (viewSection) viewSection.hidden = false;
+    if (formSection) formSection.hidden = true;
+    populateViewDrawer(student);
+  } else {
+    const isEdit = mode === 'edit';
+    if (title) title.textContent = isEdit ? 'Edit Student' : 'New Student';
+    if (viewSection) viewSection.hidden = true;
+    if (formSection) formSection.hidden = false;
+    setupFormDrawer(isEdit, student);
+  }
 }
 
 function closeDrawer() {
@@ -474,455 +671,673 @@ function closeDrawer() {
   state.drawerMode = null;
   state.editingStudent = null;
 
-  var drawer = document.getElementById('drawer');
-  var scrim = document.getElementById('scrim');
-  if (drawer) drawer.classList.remove('open');
+  const drawer = document.getElementById('drawer');
+  const scrim = document.getElementById('drawer-scrim');
+  if (drawer) {
+    drawer.classList.remove('open');
+    drawer.setAttribute('aria-hidden', 'true');
+  }
   if (scrim) scrim.classList.remove('open');
 }
 
-function renderDrawer() {
-  var content = document.getElementById('drawer-content');
-  if (!content) return;
+// ── View Mode: Populate Student Profile ─────────────────────────
+function populateViewDrawer(student) {
+  const nameEl = document.getElementById('profile-name');
+  const idEl = document.getElementById('profile-id');
+  const marksValEl = document.getElementById('profile-marks-val');
+  const marksRingEl = document.getElementById('profile-marks-ring');
+  const gradeChipWrap = document.getElementById('profile-grade-chip');
+  const rankEl = document.getElementById('profile-rank');
+  const courseEl = document.getElementById('profile-course');
+  const ageEl = document.getElementById('profile-age');
+  const emailEl = document.getElementById('profile-email');
 
-  if (state.drawerMode === 'view') {
-    renderViewDrawer(content);
-  } else if (state.drawerMode === 'create') {
-    renderFormDrawer(content, false);
-  } else if (state.drawerMode === 'edit') {
-    renderFormDrawer(content, true);
+  const grade = computeGrade(student.marks);
+  const ringColor = GRADE_COLORS[grade] || 'var(--accent)';
+  const marksDeg = ((student.marks || 0) / 100) * 360;
+
+  if (nameEl) nameEl.textContent = student.name;
+  if (idEl) idEl.textContent = student.id;
+  if (marksValEl) marksValEl.textContent = student.marks;
+
+  if (marksRingEl) {
+    marksRingEl.style.background = `conic-gradient(${ringColor} ${marksDeg}deg, var(--line) ${marksDeg}deg)`;
+  }
+
+  if (gradeChipWrap) {
+    gradeChipWrap.innerHTML = gradeChipHTML(grade);
+  }
+
+  // Calculate ranks
+  const allList = dictToList(state.allStudents);
+  allList.sort((a, b) => (b.marks || 0) - (a.marks || 0));
+  const rankOverall = allList.findIndex(s => s.id === student.id) + 1;
+
+  const courseMates = allList.filter(s => s.course === student.course);
+  const rankCourse = courseMates.findIndex(s => s.id === student.id) + 1;
+
+  if (rankEl) {
+    rankEl.textContent = `Rank #${rankOverall || 1} overall · #${rankCourse || 1} in ${student.course}`;
+  }
+
+  if (courseEl) {
+    const dotColor = getCourseDotColor(student.course);
+    courseEl.innerHTML = `<span class="course-dot" style="background-color:${dotColor};"></span>${esc(student.course)}`;
+  }
+  if (ageEl) ageEl.textContent = `${student.age} years old`;
+  if (emailEl) emailEl.textContent = student.email;
+
+  // vs Class Average bar
+  const classAvg = getClassAverage();
+  const delta = (student.marks || 0) - classAvg;
+  const deltaFormatted = (delta >= 0 ? '+' : '') + delta.toFixed(1);
+
+  const fillEl = document.getElementById('profile-avg-bar-fill');
+  const markerEl = document.getElementById('profile-avg-marker');
+  const deltaEl = document.getElementById('profile-avg-delta');
+
+  if (fillEl) fillEl.style.width = `${Math.min(student.marks || 0, 100)}%`;
+  if (markerEl) markerEl.style.left = `${Math.min(classAvg, 100)}%`;
+  if (deltaEl) {
+    deltaEl.textContent = deltaFormatted;
+    deltaEl.className = `vs-avg-delta ${delta >= 0 ? 'positive' : 'negative'}`;
   }
 }
 
-function renderViewDrawer(container) {
-  var s = state.editingStudent;
-  if (!s) return;
-  var grade = computeGrade(s.marks);
-  var cc = courseColor(s.course);
-  var pct = s.marks;
-  var gradeColor = GRADE_COLORS[grade] || '#666';
+// ── Form Mode: Setup Create / Edit ──────────────────────────────
+function setupFormDrawer(isEdit, student = null) {
+  const form = document.getElementById('student-form');
+  if (!form) return;
 
-  container.innerHTML =
-    '<div class="drawer-header">' +
-      '<h2 class="drawer-title">' + esc(s.name) + '</h2>' +
-      '<span class="mono dim">' + esc(s.id) + '</span>' +
-      '<button class="btn-icon drawer-close" id="drawer-close-btn" title="Close">✕</button>' +
-    '</div>' +
-    '<div class="drawer-body">' +
-      '<div class="marks-ring-wrap">' +
-        '<div class="marks-ring" style="background:conic-gradient(' + gradeColor + ' 0% ' + pct + '%, var(--line) ' + pct + '% 100%)">' +
-          '<div class="marks-ring-inner">' +
-            '<span class="marks-ring-value">' + s.marks + '</span>' +
-            '<span class="marks-ring-label">marks</span>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-      '<div class="view-grade">' + gradeChipHTML(grade) + '</div>' +
-      '<div class="view-details">' +
-        '<div class="view-row"><span class="view-label">Course</span><span><span class="course-dot" style="background:' + cc + '"></span>' + esc(s.course) + '</span></div>' +
-        '<div class="view-row"><span class="view-label">Age</span><span>' + esc(String(s.age)) + '</span></div>' +
-        '<div class="view-row"><span class="view-label">Email</span><span>' + esc(s.email) + '</span></div>' +
-      '</div>' +
-      '<div class="drawer-actions">' +
-        '<button class="btn btn-primary" id="drawer-edit-btn">✎ Edit</button>' +
-        '<button class="btn btn-danger" id="drawer-delete-btn">🗑 Delete</button>' +
-      '</div>' +
-    '</div>';
+  const idInput = document.getElementById('field-id');
+  const nameInput = document.getElementById('field-name');
+  const emailInput = document.getElementById('field-email');
+  const courseInput = document.getElementById('field-course');
+  const ageInput = document.getElementById('field-age');
+  const marksInput = document.getElementById('field-marks');
+  const submitBtn = document.getElementById('btn-form-submit');
 
-  document.getElementById('drawer-close-btn').addEventListener('click', closeDrawer);
-  document.getElementById('drawer-edit-btn').addEventListener('click', function() {
-    openDrawer('edit', s);
-  });
-  document.getElementById('drawer-delete-btn').addEventListener('click', function() {
-    openDeleteDialog(s);
-  });
+  clearFormErrors();
+
+  if (isEdit && student) {
+    idInput.value = student.id;
+    idInput.disabled = true;
+    nameInput.value = student.name;
+    emailInput.value = student.email;
+    courseInput.value = student.course;
+    ageInput.value = student.age;
+    marksInput.value = student.marks;
+    submitBtn.textContent = 'Save Changes';
+  } else {
+    idInput.value = suggestNextId();
+    idInput.disabled = false;
+    nameInput.value = '';
+    emailInput.value = '';
+    courseInput.value = '';
+    ageInput.value = 20;
+    marksInput.value = 50;
+    submitBtn.textContent = 'Create Student';
+  }
+
+  updateMarksSliderUI();
+  validateForm(isEdit);
 }
 
-function renderFormDrawer(container, isEdit) {
-  var s = isEdit ? state.editingStudent : null;
-  var idVal = isEdit ? s.id : nextId();
-  var nameVal = s ? s.name : '';
-  var emailVal = s ? s.email : '';
-  var courseVal = s ? s.course : '';
-  var ageVal = s ? s.age : 18;
-  var marksVal = s ? s.marks : 50;
-  var grade = computeGrade(marksVal);
+function updateMarksSliderUI() {
+  const marksInput = document.getElementById('field-marks');
+  const valEl = document.getElementById('field-marks-val');
+  const chipEl = document.getElementById('grade-preview-chip');
+  const deltaEl = document.getElementById('grade-delta-preview');
 
-  container.innerHTML =
-    '<div class="drawer-header">' +
-      '<h2 class="drawer-title">' + (isEdit ? 'Edit Student' : 'New Student') + '</h2>' +
-      '<button class="btn-icon drawer-close" id="drawer-close-btn" title="Close">✕</button>' +
-    '</div>' +
-    '<div class="drawer-body">' +
-      '<form id="student-form" autocomplete="off">' +
-        '<div class="field">' +
-          '<label for="f-id">Student ID</label>' +
-          '<input id="f-id" name="id" type="text" value="' + esc(idVal) + '"' + (isEdit ? ' disabled' : '') + ' />' +
-          '<div class="field-error" id="err-id"></div>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label for="f-name">Name</label>' +
-          '<input id="f-name" name="name" type="text" value="' + esc(nameVal) + '" />' +
-          '<div class="field-error" id="err-name"></div>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label for="f-email">Email</label>' +
-          '<input id="f-email" name="email" type="email" value="' + esc(emailVal) + '" />' +
-          '<div class="field-error" id="err-email"></div>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label for="f-course">Course</label>' +
-          '<input id="f-course" name="course" type="text" value="' + esc(courseVal) + '" list="courses-list" />' +
-          '<div class="field-error" id="err-course"></div>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label for="f-age">Age</label>' +
-          '<input id="f-age" name="age" type="number" value="' + ageVal + '" min="1" max="100" />' +
-          '<div class="field-error" id="err-age"></div>' +
-        '</div>' +
-        '<div class="field">' +
-          '<label for="f-marks">Marks <span id="marks-display" class="marks-display">' + marksVal + '</span> ' + gradeChipHTML(grade) + '</label>' +
-          '<input id="f-marks" name="marks" type="range" min="0" max="100" value="' + marksVal + '" />' +
-          '<div class="field-error" id="err-marks"></div>' +
-        '</div>' +
-        '<div class="drawer-actions">' +
-          '<button type="submit" class="btn btn-primary" id="btn-submit">' + (isEdit ? 'Save Changes' : 'Create Student') + '</button>' +
-        '</div>' +
-      '</form>' +
-    '</div>';
+  if (!marksInput) return;
+  const marks = parseInt(marksInput.value, 10) || 0;
 
-  document.getElementById('drawer-close-btn').addEventListener('click', closeDrawer);
+  if (valEl) valEl.textContent = marks;
 
-  // Marks slider → live update
-  var marksInput = document.getElementById('f-marks');
-  marksInput.addEventListener('input', function() {
-    var v = parseInt(this.value, 10);
-    document.getElementById('marks-display').textContent = v;
-    var g = computeGrade(v);
-    var label = this.closest('.field').querySelector('label');
-    var chip = label.querySelector('.grade-chip');
-    if (chip) {
-      chip.style.background = (GRADE_COLORS[g] || '#666') + '22';
-      chip.style.color = GRADE_COLORS[g] || '#666';
-      chip.style.borderColor = (GRADE_COLORS[g] || '#666') + '44';
-      chip.textContent = g;
-    }
-  });
+  const grade = computeGrade(marks);
+  if (chipEl) {
+    chipEl.className = `grade-chip ${GRADE_CLASS_MAP[grade] || 'f'}`;
+    chipEl.textContent = grade;
+  }
 
-  // Live validation
-  var form = document.getElementById('student-form');
-  var inputs = form.querySelectorAll('input');
-  inputs.forEach(function(inp) {
-    inp.addEventListener('input', function() {
-      var errs = validate(isEdit);
-      showFieldErrors(errs);
-      document.getElementById('btn-submit').disabled = Object.keys(errs).length > 0;
-    });
-  });
-
-  // Initial validation
-  var initialErrs = validate(isEdit);
-  document.getElementById('btn-submit').disabled = Object.keys(initialErrs).length > 0;
-
-  // Submit
-  form.addEventListener('submit', function(e) {
-    e.preventDefault();
-    var errs = validate(isEdit);
-    if (Object.keys(errs).length > 0) { showFieldErrors(errs); return; }
-
-    if (isEdit) {
-      submitEdit();
+  if (deltaEl) {
+    const avg = getClassAverage();
+    if (avg > 0) {
+      const delta = marks - avg;
+      const str = (delta >= 0 ? '+' : '') + delta.toFixed(1);
+      deltaEl.textContent = `(${str} vs avg)`;
     } else {
-      submitCreate();
+      deltaEl.textContent = '';
     }
+  }
+}
+
+function clearFormErrors() {
+  ['id', 'name', 'email', 'course', 'age', 'marks'].forEach(f => {
+    const el = document.getElementById(`error-${f}`);
+    if (el) el.textContent = '';
   });
 }
 
-function getFormData() {
-  return {
-    id: (document.getElementById('f-id').value || '').trim(),
-    name: (document.getElementById('f-name').value || '').trim(),
-    email: (document.getElementById('f-email').value || '').trim(),
-    course: (document.getElementById('f-course').value || '').trim(),
-    age: parseInt(document.getElementById('f-age').value, 10) || 0,
-    marks: parseInt(document.getElementById('f-marks').value, 10) || 0
-  };
+function showFieldErrors(errors) {
+  clearFormErrors();
+  for (const field in errors) {
+    const el = document.getElementById(`error-${field}`);
+    if (el) el.textContent = errors[field];
+  }
 }
 
-function validate(isEdit) {
-  var d = getFormData();
-  var e = {};
+// ── Client-side Validation ──────────────────────────────────────
+/**
+ * Mirrors server rules:
+ * Create:
+ *   - id: required, S### format
+ *   - name: letters & spaces, 2–100 chars
+ *   - age: 1–100
+ *   - course: 2–100 chars
+ *   - marks: 0–100 integer
+ *   - email: valid email
+ * Edit:
+ *   - name: letters & spaces, 2–50 chars
+ *   - age: 1–99 (lt=100)
+ *   - course: max 50 chars
+ *   - marks: 0–100
+ *   - email: valid email
+ */
+function validateForm(isEdit) {
+  const id = (document.getElementById('field-id').value || '').trim();
+  const name = (document.getElementById('field-name').value || '').trim();
+  const email = (document.getElementById('field-email').value || '').trim();
+  const course = (document.getElementById('field-course').value || '').trim();
+  const age = parseInt(document.getElementById('field-age').value, 10);
+  const marks = parseInt(document.getElementById('field-marks').value, 10);
 
+  const errors = {};
+
+  // ID validation (only on create)
   if (!isEdit) {
-    if (!d.id) e.id = 'ID is required';
-    else if (!/^S\d+$/.test(d.id)) e.id = 'ID must be S followed by digits';
+    if (!id) {
+      errors.id = 'ID is required';
+    } else if (!/^S\d+$/i.test(id)) {
+      errors.id = 'ID must start with S followed by numbers (e.g. S001)';
+    } else if (state.allStudents[id]) {
+      errors.id = 'Student with this ID already exists';
+    }
   }
 
-  if (!d.name) e.name = 'Name is required';
-  else if (!/^[A-Za-z\s]+$/.test(d.name)) e.name = 'Letters and spaces only';
-  else if (isEdit) {
-    if (d.name.length < 2 || d.name.length > 50) e.name = 'Must be 2–50 characters';
+  // Name validation
+  if (!name) {
+    errors.name = 'Name is required';
+  } else if (!/^[A-Za-z\s]+$/.test(name)) {
+    errors.name = 'Name must contain only alphabets and spaces';
+  } else if (isEdit) {
+    if (name.length < 2 || name.length > 50) errors.name = 'Name must be 2–50 characters';
   } else {
-    if (d.name.length < 2 || d.name.length > 100) e.name = 'Must be 2–100 characters';
+    if (name.length < 2 || name.length > 100) errors.name = 'Name must be 2–100 characters';
   }
 
-  if (isNaN(d.age) || d.age < 1) e.age = 'Age is required';
-  else if (isEdit) {
-    if (d.age < 1 || d.age > 99) e.age = 'Age must be 1–99';
+  // Age validation
+  if (isNaN(age)) {
+    errors.age = 'Age is required';
+  } else if (isEdit) {
+    if (age <= 0 || age >= 100) errors.age = 'Age must be between 1 and 99';
   } else {
-    if (d.age < 1 || d.age > 100) e.age = 'Age must be 1–100';
+    if (age <= 0 || age > 100) errors.age = 'Age must be between 1 and 100';
   }
 
-  if (!d.course) e.course = 'Course is required';
-  else if (isEdit) {
-    if (d.course.length > 50) e.course = 'Max 50 characters';
+  // Course validation
+  if (!course) {
+    errors.course = 'Course is required';
+  } else if (isEdit) {
+    if (course.length > 50) errors.course = 'Course cannot exceed 50 characters';
   } else {
-    if (d.course.length < 2 || d.course.length > 100) e.course = 'Must be 2–100 characters';
+    if (course.length < 2 || course.length > 100) errors.course = 'Course must be 2–100 characters';
   }
 
-  if (isNaN(d.marks) || d.marks < 0 || d.marks > 100) e.marks = 'Marks must be 0–100';
+  // Marks validation
+  if (isNaN(marks) || marks < 0 || marks > 100) {
+    errors.marks = 'Marks must be an integer between 0 and 100';
+  }
 
-  if (!d.email) e.email = 'Email is required';
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(d.email)) e.email = 'Invalid email format';
+  // Email validation
+  if (!email) {
+    errors.email = 'Email is required';
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.email = 'Please enter a valid email address';
+  }
 
-  return e;
+  showFieldErrors(errors);
+
+  const submitBtn = document.getElementById('btn-form-submit');
+  if (submitBtn) {
+    submitBtn.disabled = Object.keys(errors).length > 0;
+  }
+
+  return errors;
 }
 
-function showFieldErrors(errs) {
-  ['id', 'name', 'email', 'course', 'age', 'marks'].forEach(function(f) {
-    var el = document.getElementById('err-' + f);
-    if (el) el.textContent = errs[f] || '';
-  });
-}
-
-function submitCreate() {
-  var d = getFormData();
-  var btn = document.getElementById('btn-submit');
+// ── Submit Create ───────────────────────────────────────────────
+async function handleCreateSubmit() {
+  const btn = document.getElementById('btn-form-submit');
   btn.disabled = true;
 
-  api('POST', '/create', d).then(function() {
-    toast('Student ' + d.id + ' created', 'success');
+  const id = document.getElementById('field-id').value.trim();
+  const name = document.getElementById('field-name').value.trim();
+  const email = document.getElementById('field-email').value.trim();
+  const course = document.getElementById('field-course').value.trim();
+  const age = parseInt(document.getElementById('field-age').value, 10);
+  const marks = parseInt(document.getElementById('field-marks').value, 10);
+
+  const payload = { id, name, email, course, age, marks };
+
+  try {
+    const res = await api('POST', '/create', payload);
+    showToast(`Student ${id} created successfully!`, 'success');
     closeDrawer();
-    loadData();
-  }).catch(function(err) {
+    await loadData();
+  } catch (err) {
     if (err.status === 422 && Object.keys(err.fields).length > 0) {
       showFieldErrors(err.fields);
     } else if (err.status === 400) {
       showFieldErrors({ id: err.message });
     } else {
-      toast(err.message, 'error', err.status || undefined);
+      showToast(err.message, 'error', err.status || null);
     }
     btn.disabled = false;
-  });
+  }
 }
 
-function submitEdit() {
-  var d = getFormData();
-  var s = state.editingStudent;
-  var changed = {};
-  if (d.name !== s.name) changed.name = d.name;
-  if (d.email !== s.email) changed.email = d.email;
-  if (d.course !== s.course) changed.course = d.course;
-  if (d.age !== s.age) changed.age = d.age;
-  if (d.marks !== s.marks) changed.marks = d.marks;
+// ── Submit Edit (Partial Update) ────────────────────────────────
+async function handleEditSubmit() {
+  const btn = document.getElementById('btn-form-submit');
+  const orig = state.editingStudent;
+  if (!orig) return;
+
+  const name = document.getElementById('field-name').value.trim();
+  const email = document.getElementById('field-email').value.trim();
+  const course = document.getElementById('field-course').value.trim();
+  const age = parseInt(document.getElementById('field-age').value, 10);
+  const marks = parseInt(document.getElementById('field-marks').value, 10);
+
+  // Send only changed fields
+  const changed = {};
+  if (name !== orig.name) changed.name = name;
+  if (email !== orig.email) changed.email = email;
+  if (course !== orig.course) changed.course = course;
+  if (age !== orig.age) changed.age = age;
+  if (marks !== orig.marks) changed.marks = marks;
 
   if (Object.keys(changed).length === 0) {
-    toast('Nothing changed', 'success');
+    showToast('Nothing changed', 'success');
     return;
   }
 
-  var btn = document.getElementById('btn-submit');
   btn.disabled = true;
 
-  api('PUT', '/update/' + s.id, changed).then(function() {
-    toast('Student ' + s.id + ' updated', 'success');
+  try {
+    await api('PUT', `/update/${orig.id}`, changed);
+    showToast(`Student ${orig.id} updated successfully!`, 'success');
     closeDrawer();
-    loadData();
-  }).catch(function(err) {
+    await loadData();
+  } catch (err) {
     if (err.status === 422 && Object.keys(err.fields).length > 0) {
       showFieldErrors(err.fields);
     } else {
-      toast(err.message, 'error', err.status || undefined);
+      showToast(err.message, 'error', err.status || null);
     }
     btn.disabled = false;
-  });
+  }
 }
 
-// ── Delete Dialog ────────────────────────────────────────────
-function openDeleteDialog(student) {
-  var dialog = document.getElementById('delete-dialog');
+// ── Delete Confirmation Modal Flow ──────────────────────────────
+function openDeleteModal(student) {
+  const dialog = document.getElementById('delete-dialog');
   if (!dialog) return;
 
-  document.getElementById('del-student-name').textContent = student.name;
-  document.getElementById('del-confirm-input').value = '';
-  document.getElementById('btn-del-confirm').disabled = true;
+  const nameEl = document.getElementById('delete-student-name');
+  const expectedIdEl = document.getElementById('delete-expected-id');
+  const confirmInput = document.getElementById('delete-confirm-input');
+  const confirmBtn = document.getElementById('btn-delete-confirm');
+
+  if (nameEl) nameEl.textContent = student.name;
+  if (expectedIdEl) expectedIdEl.textContent = student.id;
+  if (confirmInput) {
+    confirmInput.value = '';
+    confirmInput.placeholder = student.id;
+  }
+  if (confirmBtn) confirmBtn.disabled = true;
 
   dialog.dataset.studentId = student.id;
   dialog.showModal();
 
-  var input = document.getElementById('del-confirm-input');
-  input.focus();
-  input.oninput = function() {
-    document.getElementById('btn-del-confirm').disabled = input.value.trim() !== student.id;
-  };
+  if (confirmInput) {
+    confirmInput.focus();
+    confirmInput.oninput = () => {
+      confirmBtn.disabled = confirmInput.value.trim() !== student.id;
+    };
+  }
 }
 
-function confirmDelete() {
-  var dialog = document.getElementById('delete-dialog');
-  var sid = dialog.dataset.studentId;
-  var btn = document.getElementById('btn-del-confirm');
+async function handleConfirmDelete() {
+  const dialog = document.getElementById('delete-dialog');
+  const sid = dialog ? dialog.dataset.studentId : null;
+  const btn = document.getElementById('btn-delete-confirm');
+
+  if (!sid) return;
   btn.disabled = true;
 
-  api('DELETE', '/delete/' + sid).then(function() {
-    toast('Student ' + sid + ' deleted', 'success');
+  try {
+    await api('DELETE', `/delete/${sid}`);
+    showToast(`Student ${sid} deleted successfully!`, 'success');
     dialog.close();
     closeDrawer();
 
-    // Check if page will be empty after delete
-    var totalAfter = state.total - 1;
-    var maxPage = Math.max(1, Math.ceil(totalAfter / state.limit));
+    // Adjust page if current page becomes empty
+    const totalAfter = state.total - 1;
+    const maxPage = Math.max(1, Math.ceil(totalAfter / state.limit));
     if (state.page > maxPage) state.page = maxPage;
 
-    loadData();
-  }).catch(function(err) {
-    toast(err.message, 'error', err.status || undefined);
+    await loadData();
+  } catch (err) {
+    showToast(err.message, 'error', err.status || null);
     btn.disabled = false;
-  });
-}
-
-// ── Event delegation on table ────────────────────────────────
-function onTableClick(e) {
-  var btn = e.target.closest('.btn-edit');
-  if (btn) {
-    e.stopPropagation();
-    var id = btn.dataset.id;
-    var s = Object.assign({}, state.allStudents[id], { id: id });
-    openDrawer('edit', s);
-    return;
-  }
-
-  btn = e.target.closest('.btn-delete');
-  if (btn) {
-    e.stopPropagation();
-    var id2 = btn.dataset.id;
-    var s2 = Object.assign({}, state.allStudents[id2], { id: id2 });
-    openDeleteDialog(s2);
-    return;
-  }
-
-  var row = e.target.closest('.student-row');
-  if (row) {
-    var id3 = row.dataset.id;
-    var s3 = Object.assign({}, state.allStudents[id3], { id: id3 });
-    openDrawer('view', s3);
   }
 }
 
-function onTableKeydown(e) {
-  if (e.key === 'Enter') {
-    var row = e.target.closest('.student-row');
-    if (row) {
-      var id = row.dataset.id;
-      var s = Object.assign({}, state.allStudents[id], { id: id });
-      openDrawer('view', s);
-    }
+// ── Quick Find / Lookup ─────────────────────────────────────────
+async function lookupStudentById(id) {
+  try {
+    // SINGULAR PATH: /student/{id}
+    const data = await api('GET', `/student/${encodeURIComponent(id)}`);
+    const student = { id, ...data };
+    openDrawer('view', student);
+  } catch (err) {
+    showToast(err.message, 'error', err.status || null);
   }
 }
 
-// ── Initialisation ───────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-  loadPrefs();
-
-  // Base URL input
-  var urlInput = document.getElementById('input-url');
+// ── Event Listeners Setup ───────────────────────────────────────
+function setupEventListeners() {
+  // API URL change
+  const urlInput = document.getElementById('api-url-input');
   if (urlInput) {
     urlInput.value = state.baseUrl;
-    urlInput.addEventListener('change', function() {
-      state.baseUrl = this.value.replace(/\/+$/, '');
-      saveBaseUrl();
+    urlInput.addEventListener('change', () => {
+      state.baseUrl = urlInput.value.trim().replace(/\/+$/, '');
+      savePreferences();
+      state.page = 1;
       loadData();
     });
+  }
+
+  // Reconnect button
+  const reconnBtn = document.getElementById('btn-reconnect');
+  if (reconnBtn) {
+    reconnBtn.addEventListener('click', () => loadData());
   }
 
   // Theme toggle
-  var themeBtn = document.getElementById('btn-theme');
-  if (themeBtn) themeBtn.addEventListener('click', toggleTheme);
+  const themeBtn = document.getElementById('btn-theme');
+  if (themeBtn) {
+    themeBtn.addEventListener('click', toggleTheme);
+  }
 
-  // New student
-  var newBtn = document.getElementById('btn-new');
-  if (newBtn) newBtn.addEventListener('click', function() { openDrawer('create', null); });
+  // New Student button
+  const newBtn = document.getElementById('btn-new-student');
+  if (newBtn) {
+    newBtn.addEventListener('click', () => openDrawer('create'));
+  }
 
-  // Course filter
-  var selCourse = document.getElementById('sel-course');
-  if (selCourse) selCourse.addEventListener('change', function() {
-    state.course = this.value;
-    state.page = 1;
-    loadData();
-  });
-
-  // Sort
-  var selSort = document.getElementById('sel-sort');
-  if (selSort) selSort.addEventListener('change', function() {
-    state.sortBy = this.value;
-    state.page = 1;
-    loadData();
-  });
-
-  // Order
-  var selOrder = document.getElementById('sel-order');
-  if (selOrder) selOrder.addEventListener('change', function() {
-    state.order = this.value;
-    state.page = 1;
-    loadData();
-  });
-
-  // Search
-  var searchInput = document.getElementById('input-search');
-  if (searchInput) searchInput.addEventListener('input', function() {
-    state.search = this.value.trim();
-    state.page = 1;
-    loadData();
-  });
-
-  // Limit
-  var selLimit = document.getElementById('sel-limit');
-  if (selLimit) {
-    selLimit.value = String(state.limit);
-    selLimit.addEventListener('change', function() {
-      state.limit = parseInt(this.value, 10) || 10;
+  // Course Filter
+  const courseSel = document.getElementById('filter-course');
+  if (courseSel) {
+    courseSel.addEventListener('change', () => {
+      state.course = courseSel.value;
       state.page = 1;
-      saveLimit();
       loadData();
     });
   }
 
-  // Table events
-  var tbody = document.getElementById('student-tbody');
-  if (tbody) {
-    tbody.addEventListener('click', onTableClick);
-    tbody.addEventListener('keydown', onTableKeydown);
+  // Sort By
+  const sortSel = document.getElementById('sort-by');
+  if (sortSel) {
+    sortSel.addEventListener('change', () => {
+      state.sortBy = sortSel.value;
+      state.page = 1;
+      loadData();
+    });
   }
 
-  // Scrim
-  var scrim = document.getElementById('scrim');
-  if (scrim) scrim.addEventListener('click', closeDrawer);
+  // Asc / Desc Segmented Buttons
+  const ascBtn = document.getElementById('sort-asc');
+  const descBtn = document.getElementById('sort-desc');
 
-  // Escape key
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && state.drawerOpen) closeDrawer();
+  if (ascBtn && descBtn) {
+    ascBtn.addEventListener('click', () => {
+      if (state.order !== 'asc') {
+        state.order = 'asc';
+        ascBtn.classList.add('active');
+        descBtn.classList.remove('active');
+        ascBtn.setAttribute('aria-checked', 'true');
+        descBtn.setAttribute('aria-checked', 'false');
+        state.page = 1;
+        loadData();
+      }
+    });
+
+    descBtn.addEventListener('click', () => {
+      if (state.order !== 'desc') {
+        state.order = 'desc';
+        descBtn.classList.add('active');
+        ascBtn.classList.remove('active');
+        descBtn.setAttribute('aria-checked', 'true');
+        ascBtn.setAttribute('aria-checked', 'false');
+        state.page = 1;
+        loadData();
+      }
+    });
+  }
+
+  // Search input with debounce
+  const searchInput = document.getElementById('search-input');
+  if (searchInput) {
+    let debounceTimer = null;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        state.search = searchInput.value;
+        state.page = 1;
+        loadData();
+      }, 250);
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const q = searchInput.value.trim();
+        // If it looks like an exact ID (e.g. S001), open it directly
+        if (/^S\d+$/i.test(q)) {
+          lookupStudentById(q);
+        }
+      }
+    });
+  }
+
+  // Page size selector
+  const limitSel = document.getElementById('page-size-select');
+  if (limitSel) {
+    limitSel.value = String(state.limit);
+    limitSel.addEventListener('change', () => {
+      state.limit = parseInt(limitSel.value, 10) || 10;
+      state.page = 1;
+      savePreferences();
+      loadData();
+    });
+  }
+
+  // Pager buttons
+  const prevBtn = document.getElementById('btn-prev-page');
+  const nextBtn = document.getElementById('btn-next-page');
+
+  if (prevBtn) {
+    prevBtn.addEventListener('click', () => {
+      if (state.page > 1) {
+        state.page--;
+        loadData();
+      }
+    });
+  }
+
+  if (nextBtn) {
+    nextBtn.addEventListener('click', () => {
+      const totalPages = Math.max(1, Math.ceil(state.total / state.limit));
+      if (state.page < totalPages) {
+        state.page++;
+        loadData();
+      }
+    });
+  }
+
+  // Table row click & keyboard delegation
+  const tbody = document.getElementById('students-tbody');
+  if (tbody) {
+    tbody.addEventListener('click', (e) => {
+      // Edit button clicked
+      const editBtn = e.target.closest('.action-edit');
+      if (editBtn) {
+        e.stopPropagation();
+        const sid = editBtn.dataset.id;
+        const student = state.allStudents[sid]
+          ? { ...state.allStudents[sid], id: sid }
+          : state.students.find(s => s.id === sid);
+        if (student) openDrawer('edit', student);
+        return;
+      }
+
+      // Delete button clicked
+      const delBtn = e.target.closest('.action-del');
+      if (delBtn) {
+        e.stopPropagation();
+        const sid = delBtn.dataset.id;
+        const student = state.allStudents[sid]
+          ? { ...state.allStudents[sid], id: sid }
+          : state.students.find(s => s.id === sid);
+        if (student) openDeleteModal(student);
+        return;
+      }
+
+      // Row clicked -> open profile view
+      const row = e.target.closest('.student-row');
+      if (row) {
+        const sid = row.dataset.id;
+        const student = state.allStudents[sid]
+          ? { ...state.allStudents[sid], id: sid }
+          : state.students.find(s => s.id === sid);
+        if (student) openDrawer('view', student);
+      }
+    });
+
+    tbody.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const row = e.target.closest('.student-row');
+        if (row) {
+          const sid = row.dataset.id;
+          const student = state.allStudents[sid]
+            ? { ...state.allStudents[sid], id: sid }
+            : state.students.find(s => s.id === sid);
+          if (student) openDrawer('view', student);
+        }
+      }
+    });
+  }
+
+  // Drawer Profile Actions
+  const drawerEditBtn = document.getElementById('btn-profile-edit');
+  const drawerDelBtn = document.getElementById('btn-profile-delete');
+  const drawerCloseBtn = document.getElementById('btn-drawer-close');
+  const drawerScrim = document.getElementById('drawer-scrim');
+
+  if (drawerEditBtn) {
+    drawerEditBtn.addEventListener('click', () => {
+      if (state.editingStudent) {
+        openDrawer('edit', state.editingStudent);
+      }
+    });
+  }
+
+  if (drawerDelBtn) {
+    drawerDelBtn.addEventListener('click', () => {
+      if (state.editingStudent) {
+        openDeleteModal(state.editingStudent);
+      }
+    });
+  }
+
+  if (drawerCloseBtn) drawerCloseBtn.addEventListener('click', closeDrawer);
+  if (drawerScrim) drawerScrim.addEventListener('click', closeDrawer);
+
+  // Global Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && state.drawerOpen) {
+      closeDrawer();
+    }
   });
 
-  // Reconnect
-  var reconnBtn = document.getElementById('btn-reconnect');
-  if (reconnBtn) reconnBtn.addEventListener('click', function() { loadData(); });
+  // Drawer Form Events
+  const form = document.getElementById('student-form');
+  if (form) {
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const isEdit = state.drawerMode === 'edit';
+      const errors = validateForm(isEdit);
+      if (Object.keys(errors).length > 0) return;
 
-  // Delete dialog buttons
-  var delConfirm = document.getElementById('btn-del-confirm');
-  if (delConfirm) delConfirm.addEventListener('click', confirmDelete);
-  var delCancel = document.getElementById('btn-del-cancel');
-  if (delCancel) delCancel.addEventListener('click', function() {
-    document.getElementById('delete-dialog').close();
-  });
+      if (isEdit) {
+        handleEditSubmit();
+      } else {
+        handleCreateSubmit();
+      }
+    });
 
-  // Initial load
+    // Real-time live validation on input
+    form.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', () => {
+        validateForm(state.drawerMode === 'edit');
+      });
+    });
+
+    // Range slider live UI update
+    const marksSlider = document.getElementById('field-marks');
+    if (marksSlider) {
+      marksSlider.addEventListener('input', updateMarksSliderUI);
+    }
+
+    const cancelBtn = document.getElementById('btn-form-cancel');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        if (state.drawerMode === 'edit' && state.editingStudent) {
+          openDrawer('view', state.editingStudent);
+        } else {
+          closeDrawer();
+        }
+      });
+    }
+  }
+
+  // Delete Dialog buttons
+  const delConfirmBtn = document.getElementById('btn-delete-confirm');
+  const delCancelBtn = document.getElementById('btn-delete-cancel');
+
+  if (delConfirmBtn) delConfirmBtn.addEventListener('click', handleConfirmDelete);
+  if (delCancelBtn) {
+    delCancelBtn.addEventListener('click', () => {
+      document.getElementById('delete-dialog').close();
+    });
+  }
+}
+
+// ── Application Initialization ──────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  loadPreferences();
+  setupEventListeners();
   loadData();
 });
