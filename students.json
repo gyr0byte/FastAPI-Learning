@@ -54,5 +54,12 @@
         "course": "Python",
         "marks": 89,
         "email": "ava@example.com"
+    },
+    "S009": {
+        "name": "John Smith",
+        "age": 25,
+        "course": "AI",
+        "marks": 92,
+        "email": "john@example.com"
     }
 }
