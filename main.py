@@ -1,9 +1,11 @@
 import json
 
 from fastapi import FastAPI, HTTPException, Path, Query
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
 
 app = FastAPI()
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 """ 
 HTTP Method:
@@ -229,7 +231,7 @@ def update_student(
     existing = data[id]
     
     # STEP 2 : Only the field the client actually sent
-    update = student_update.model_dump()
+    update = student_update.model_dump(exclude_unset=True) # exclude_unset=True -> only the fields that were actually sent in the request body will be included in the resulting dictionary.
 
     # STEP 3 : Copy the new value on the top of old one
     for key, value in update.items():
