@@ -1,18 +1,27 @@
-import streamlit as st
-import requests
-import time
-import html
-import math
+"""
+Student Registry — Streamlit Frontend
+Talking to FastAPI student backend (main.py)
+"""
+
 import csv
+import html
 import io
-from datetime import datetime
+import math
+import re
+import time
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Optional
 
-# ─── Page Config ────────────────────────────────────────────────────────────────
+import altair as alt
+import pandas as pd
+import requests
+import streamlit as st
+
+# ─── Page Configuration ─────────────────────────────────────────────────────────
 st.set_page_config(page_title="Student Registry", page_icon="📘", layout="wide")
 
-# ─── Theme Detection ────────────────────────────────────────────────────────────
+# ─── Theme Detection & Tokens ───────────────────────────────────────────────────
 try:
     _theme_type = st.context.theme.type
 except Exception:
@@ -20,13 +29,12 @@ except Exception:
 
 IS_DARK = _theme_type == "dark"
 
-# ─── Design Tokens ───────────────────────────────────────────────────────────────
 if IS_DARK:
     TOK_BG = "#111110"
     TOK_SURFACE = "#1a1916"
     TOK_INK = "#ecebe5"
-    TOK_MUTED = "#7a766c"
-    TOK_LINE = "#2a2822"
+    TOK_MUTED = "#9a968c"
+    TOK_LINE = "#2a2825"
     TOK_ACCENT = "#86bfa9"
     TOK_DANGER = "#e0846f"
 else:
@@ -39,99 +47,114 @@ else:
     TOK_DANGER = "#b0412d"
 
 GRADE_COLORS = {
-    "A+": "#1b7a44" if not IS_DARK else "#4caf6a",
-    "A": "#2e8b57" if not IS_DARK else "#66bb6a",
-    "B": "#6b8e23" if not IS_DARK else "#9e9d24",
-    "C": "#d4a017" if not IS_DARK else "#ffb300",
-    "F": "#c0392b" if not IS_DARK else "#ef5350",
+    "A+": "#2d5a4c" if not IS_DARK else "#86bfa9",
+    "A":  "#3d7a5c" if not IS_DARK else "#6daa8e",
+    "B":  "#6b7a2d" if not IS_DARK else "#a8b86d",
+    "C":  "#b8860b" if not IS_DARK else "#daa520",
+    "F":  "#b0412d" if not IS_DARK else "#e0846f",
 }
 
-COURSE_PALETTE = ["#e07b5a", "#5a9fd4", "#8bc34a", "#ab47bc", "#26a69a", "#ff7043", "#5c6bc0", "#78909c"]
+COURSE_PALETTE = [
+    "#e07b5a", "#d4a843", "#7cb87a", "#5b9bd5",
+    "#9b7cb8", "#d47ba0", "#5bbab5", "#b89b5a"
+]
 
 METHOD_COLORS = {
     "GET": TOK_ACCENT,
-    "POST": "#4a90d9",
-    "PUT": "#d4a017",
+    "POST": "#3b82f6",
+    "PUT": "#d97706",
     "DELETE": TOK_DANGER,
 }
 
-# ─── CSS Injection ───────────────────────────────────────────────────────────────
-_css = f"""
+# ─── Custom CSS Injection ───────────────────────────────────────────────────────
+# Hide default Streamlit chrome and inject design language styles
+_custom_css = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap');
 
-:root {{
-    --tok-bg: {TOK_BG};
-    --tok-surface: {TOK_SURFACE};
-    --tok-ink: {TOK_INK};
-    --tok-muted: {TOK_MUTED};
-    --tok-line: {TOK_LINE};
-    --tok-accent: {TOK_ACCENT};
-    --tok-danger: {TOK_DANGER};
-}}
+:root {
+    --tok-bg: %(bg)s;
+    --tok-surface: %(surface)s;
+    --tok-ink: %(ink)s;
+    --tok-muted: %(muted)s;
+    --tok-line: %(line)s;
+    --tok-accent: %(accent)s;
+    --tok-danger: %(danger)s;
+}
 
-#MainMenu {{visibility: hidden;}}
-footer {{visibility: hidden;}}
-[data-testid="stStatusWidget"] {{visibility: hidden;}}
-header [data-testid="stDeployButton"] {{display: none;}}
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+[data-testid="stStatusWidget"] {visibility: hidden;}
+header [data-testid="stDeployButton"] {display: none;}
 
-.title-font {{
-    font-family: 'Instrument Serif', serif;
-}}
-.ui-font {{
+.brand-heading {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-size: 2.8rem;
+    line-height: 1.1;
+    color: var(--tok-ink);
+}
+.brand-heading em {
+    font-style: italic;
+    color: var(--tok-accent);
+}
+.brand-subtitle {
     font-family: 'Geist', sans-serif;
-}}
-.mono-font {{
-    font-family: 'Geist Mono', monospace;
-}}
+    font-size: 0.92rem;
+    color: var(--tok-muted);
+    margin-top: 4px;
+}
 
-.stat-card {{
+.stat-card {
     background: var(--tok-surface);
     border: 1px solid var(--tok-line);
     border-radius: 12px;
-    padding: 20px 22px;
+    padding: 18px 20px;
     height: 100%%;
-}}
-.stat-card .stat-label {{
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.stat-card .stat-label {
     font-family: 'Geist', sans-serif;
     font-size: 0.78rem;
+    font-weight: 600;
     color: var(--tok-muted);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-bottom: 4px;
-}}
-.stat-card .stat-value {{
-    font-family: 'Instrument Serif', serif;
-    font-size: 2.2rem;
+}
+.stat-card .stat-value {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-size: 2.3rem;
     color: var(--tok-ink);
     line-height: 1.1;
-}}
-.stat-card .stat-sub {{
+}
+.stat-card .stat-sub {
     font-family: 'Geist', sans-serif;
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     color: var(--tok-muted);
-    margin-top: 4px;
-}}
+    margin-top: 6px;
+}
 
-.grade-chip {{
+.grade-chip {
     display: inline-block;
     padding: 2px 10px;
     border-radius: 999px;
     font-family: 'Geist', sans-serif;
     font-weight: 600;
-    font-size: 0.82rem;
-}}
+    font-size: 0.8rem;
+}
 
-.course-dot {{
+.course-dot {
     display: inline-block;
     width: 8px;
     height: 8px;
     border-radius: 50%%;
     margin-right: 6px;
     vertical-align: middle;
-}}
+}
 
-.request-line {{
+.request-line {
     font-family: 'Geist Mono', monospace;
     font-size: 0.82rem;
     background: var(--tok-surface);
@@ -141,135 +164,166 @@ header [data-testid="stDeployButton"] {{display: none;}}
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin: 8px 0 12px 0;
-}}
-.request-line .method {{
+    margin: 8px 0 16px 0;
+}
+.request-line .method {
     font-weight: 700;
     margin-right: 8px;
-}}
-.request-line .status-ok {{
+}
+.request-line .status-ok {
     color: var(--tok-accent);
-}}
-.request-line .status-err {{
+}
+.request-line .status-err {
     color: var(--tok-danger);
-}}
+}
 
-.status-pill {{
+.status-pill {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     font-family: 'Geist', sans-serif;
     font-size: 0.82rem;
-    padding: 4px 12px;
+    padding: 5px 14px;
     border-radius: 999px;
     border: 1px solid var(--tok-line);
     background: var(--tok-surface);
-}}
-.status-pill .dot {{
+    margin-bottom: 12px;
+}
+.status-pill .dot {
     width: 8px;
     height: 8px;
     border-radius: 50%%;
-}}
-.status-pill .dot.online {{
-    background: #4caf50;
-    animation: pulse 2s infinite;
-}}
-.status-pill .dot.offline {{
+}
+.status-pill .dot.online {
+    background: #22c55e;
+    box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+    animation: pulse 2s infinite ease-in-out;
+}
+.status-pill .dot.offline {
     background: var(--tok-danger);
-}}
-@keyframes pulse {{
-    0%%, 100%% {{ opacity: 1; }}
-    50%% {{ opacity: 0.4; }}
-}}
+}
+@keyframes pulse {
+    0%%, 100%% { opacity: 1; }
+    50%% { opacity: 0.4; }
+}
 
-.profile-panel {{
+.profile-panel {
     background: var(--tok-surface);
     border: 1px solid var(--tok-line);
     border-radius: 14px;
     padding: 24px;
-}}
-.profile-panel .profile-name {{
-    font-family: 'Instrument Serif', serif;
-    font-size: 1.6rem;
+}
+.profile-panel .profile-name {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-size: 1.8rem;
     color: var(--tok-ink);
-}}
-.profile-panel .profile-id {{
+    line-height: 1.1;
+}
+.profile-panel .profile-id {
     font-family: 'Geist Mono', monospace;
     font-size: 0.82rem;
     color: var(--tok-muted);
-}}
-.profile-panel .profile-field {{
+    margin-top: 2px;
+}
+.profile-panel .profile-field {
     font-family: 'Geist', sans-serif;
     font-size: 0.88rem;
     color: var(--tok-ink);
-    margin: 4px 0;
-}}
-.profile-panel .profile-field-label {{
+    margin: 6px 0;
+}
+.profile-panel .profile-field-label {
     color: var(--tok-muted);
     font-size: 0.78rem;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-}}
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
 
-.marks-ring {{
-    width: 100px;
-    height: 100px;
+.marks-ring {
+    width: 110px;
+    height: 110px;
     border-radius: 50%%;
     display: flex;
     align-items: center;
     justify-content: center;
-    margin: 12px auto;
-}}
-.marks-ring .marks-value {{
-    font-family: 'Instrument Serif', serif;
-    font-size: 1.8rem;
-    color: var(--tok-ink);
-}}
-
-.grade-bar {{
+    margin: 14px auto;
+}
+.marks-ring .marks-ring-inner {
+    width: 82px;
+    height: 82px;
+    border-radius: 50%%;
+    background: var(--tok-surface);
     display: flex;
-    height: 10px;
-    border-radius: 5px;
-    overflow: hidden;
-    margin: 6px 0;
-}}
-.grade-bar-segment {{
-    height: 100%%;
-}}
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+.marks-ring .marks-value {
+    font-family: 'Instrument Serif', Georgia, serif;
+    font-size: 2rem;
+    color: var(--tok-ink);
+    line-height: 1;
+}
+.marks-ring .marks-label {
+    font-family: 'Geist', sans-serif;
+    font-size: 0.7rem;
+    color: var(--tok-muted);
+}
 
-.empty-state {{
+.grade-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 8px 0;
+    background: var(--tok-line);
+}
+.grade-bar-segment {
+    height: 100%%;
+}
+
+.empty-state {
     text-align: center;
-    padding: 40px 20px;
+    padding: 48px 20px;
     color: var(--tok-muted);
     font-family: 'Geist', sans-serif;
-}}
-.empty-state .empty-icon {{
-    font-size: 2.4rem;
+}
+.empty-state .empty-icon {
+    font-size: 2.2rem;
     margin-bottom: 8px;
-}}
+}
 
-.diff-old {{
+.diff-old {
     text-decoration: line-through;
     color: var(--tok-danger);
     margin-right: 6px;
-}}
-.diff-new {{
+}
+.diff-new {
     color: var(--tok-accent);
     font-weight: 600;
-}}
+}
 
-.delete-container {{
-    border: 2px solid var(--tok-danger);
-    border-radius: 10px;
-    padding: 16px;
-}}
+div[data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] button[kind="primary"][key="delete_confirm_btn"]) button[kind="primary"],
+div[key="delete_confirm_container"] button[kind="primary"] {
+    background-color: var(--tok-danger) !important;
+    border-color: var(--tok-danger) !important;
+    color: #ffffff !important;
+}
 </style>
-"""
-st.markdown(_css, unsafe_allow_html=True)
+""" % {
+    "bg": TOK_BG,
+    "surface": TOK_SURFACE,
+    "ink": TOK_INK,
+    "muted": TOK_MUTED,
+    "line": TOK_LINE,
+    "accent": TOK_ACCENT,
+    "danger": TOK_DANGER,
+}
+st.markdown(_custom_css, unsafe_allow_html=True)
 
 
-# ─── Session State Init ──────────────────────────────────────────────────────────
-def _init_state():
+# ─── Session State Initialization ───────────────────────────────────────────────
+def init_session_state():
     defaults = {
         "api_base": "http://127.0.0.1:8000",
         "activity_log": [],
@@ -284,6 +338,7 @@ def _init_state():
         "connected": False,
         "toast_msg": None,
         "quick_find_result": None,
+        "selected_student_id": None,
         "prev_course_filter": None,
         "prev_sort_field": None,
         "prev_sort_order": "↑ Asc",
@@ -296,15 +351,15 @@ def _init_state():
             st.session_state[k] = v
 
 
-_init_state()
+init_session_state()
 
-# Show pending toast
+# Display persisted toast survived across st.rerun()
 if st.session_state.toast_msg:
     st.toast(st.session_state.toast_msg, icon="✅")
     st.session_state.toast_msg = None
 
 
-# ─── API Helper ──────────────────────────────────────────────────────────────────
+# ─── Unified API Helper & Custom Error ──────────────────────────────────────────
 @dataclass
 class ApiError(Exception):
     status: int
@@ -314,9 +369,10 @@ class ApiError(Exception):
 
     def __post_init__(self):
         if self.status == 422 and isinstance(self.detail, list):
+            # Parse FastAPI 422 errors [{loc: [..., "field"], msg: "Value error, ..."}]
             for err in self.detail:
                 loc = err.get("loc", [])
-                field_name = loc[-1] if loc else "unknown"
+                field_name = loc[-1] if loc else "general"
                 msg = err.get("msg", "")
                 if msg.startswith("Value error, "):
                     msg = msg[len("Value error, "):]
@@ -330,15 +386,17 @@ class ApiError(Exception):
 
 
 def api(method: str, path: str, body: Optional[dict] = None) -> Any:
+    """Centralized HTTP wrapper with timing, activity logging, and ApiError parsing."""
     base = st.session_state.api_base.rstrip("/")
     url = f"{base}{path}"
     start = time.time()
     status = 0
+
     try:
         resp = requests.request(method, url, json=body, timeout=8)
         elapsed_ms = int((time.time() - start) * 1000)
         status = resp.status_code
-        # Record to log
+
         log_entry = {
             "time": datetime.now().strftime("%H:%M:%S"),
             "method": method,
@@ -347,17 +405,19 @@ def api(method: str, path: str, body: Optional[dict] = None) -> Any:
             "ms": elapsed_ms,
             "ok": 200 <= status < 300,
         }
-        log = list(st.session_state.activity_log)
-        log.insert(0, log_entry)
-        st.session_state.activity_log = log[:100]
+        st.session_state.activity_log = [log_entry] + st.session_state.activity_log[:99]
         st.session_state.last_request = log_entry
         st.session_state.connected = True
 
         if 200 <= status < 300:
             return resp.json()
         else:
-            detail = resp.json().get("detail", resp.text)
+            try:
+                detail = resp.json().get("detail", resp.text)
+            except Exception:
+                detail = resp.text
             raise ApiError(status=status, detail=detail)
+
     except ApiError:
         raise
     except requests.exceptions.ConnectionError:
@@ -370,9 +430,7 @@ def api(method: str, path: str, body: Optional[dict] = None) -> Any:
             "ms": elapsed_ms,
             "ok": False,
         }
-        log = list(st.session_state.activity_log)
-        log.insert(0, log_entry)
-        st.session_state.activity_log = log[:100]
+        st.session_state.activity_log = [log_entry] + st.session_state.activity_log[:99]
         st.session_state.last_request = log_entry
         st.session_state.connected = False
         raise ApiError(status=0, detail="Can't reach the API. Is `uvicorn main:app --reload` running?")
@@ -386,9 +444,7 @@ def api(method: str, path: str, body: Optional[dict] = None) -> Any:
             "ms": elapsed_ms,
             "ok": False,
         }
-        log = list(st.session_state.activity_log)
-        log.insert(0, log_entry)
-        st.session_state.activity_log = log[:100]
+        st.session_state.activity_log = [log_entry] + st.session_state.activity_log[:99]
         st.session_state.last_request = log_entry
         st.session_state.connected = False
         raise ApiError(status=0, detail="Request timed out after 8 seconds.")
@@ -402,22 +458,21 @@ def api(method: str, path: str, body: Optional[dict] = None) -> Any:
             "ms": elapsed_ms,
             "ok": False,
         }
-        log = list(st.session_state.activity_log)
-        log.insert(0, log_entry)
-        st.session_state.activity_log = log[:100]
+        st.session_state.activity_log = [log_entry] + st.session_state.activity_log[:99]
         st.session_state.last_request = log_entry
         raise ApiError(status=0, detail=str(e))
 
 
-# ─── Utility Functions ───────────────────────────────────────────────────────────
+# ─── Pure Utility Helpers ───────────────────────────────────────────────────────
 def compute_grade(marks: int) -> str:
-    if marks >= 90:
+    m = int(marks)
+    if m >= 90:
         return "A+"
-    elif marks >= 80:
+    elif m >= 80:
         return "A"
-    elif marks >= 70:
+    elif m >= 70:
         return "B"
-    elif marks >= 60:
+    elif m >= 60:
         return "C"
     else:
         return "F"
@@ -430,9 +485,7 @@ def grade_chip_html(grade: str) -> str:
 
 
 def course_dot_html(course: str, courses_sorted: list) -> str:
-    idx = 0
-    if course in courses_sorted:
-        idx = courses_sorted.index(course)
+    idx = courses_sorted.index(course) if course in courses_sorted else 0
     color = COURSE_PALETTE[idx % len(COURSE_PALETTE)]
     return f'<span class="course-dot" style="background:{color};"></span>'
 
@@ -440,16 +493,16 @@ def course_dot_html(course: str, courses_sorted: list) -> str:
 def get_next_id(all_students: dict) -> str:
     max_num = 0
     for sid in all_students.keys():
-        try:
-            num = int(sid[1:])
+        match = re.match(r"^S(\d+)$", sid, re.IGNORECASE)
+        if match:
+            num = int(match.group(1))
             if num > max_num:
                 max_num = num
-        except (ValueError, IndexError):
-            pass
     return f"S{max_num + 1:03d}"
 
 
 def dict_to_list(d: dict) -> list:
+    """Converts student dict { 'S001': {...} } to list of dicts with 'id' inserted."""
     result = []
     for sid, sdata in d.items():
         row = dict(sdata)
@@ -459,6 +512,7 @@ def dict_to_list(d: dict) -> list:
 
 
 def render_request_line():
+    """Renders the last API call in Geist Mono font."""
     req = st.session_state.last_request
     if req is None:
         return
@@ -467,6 +521,7 @@ def render_request_line():
     m_color = METHOD_COLORS.get(req["method"], TOK_MUTED)
     status_class = "status-ok" if req["ok"] else "status-err"
     status_text = f'{req["status"]} · {req["ms"]} ms' if req["status"] else f'ERR · {req["ms"]} ms'
+
     st.markdown(
         f'<div class="request-line">'
         f'<span><span class="method" style="color:{m_color};">{method}</span> {path}</span>'
@@ -476,48 +531,329 @@ def render_request_line():
     )
 
 
-# ─── Data Loading ────────────────────────────────────────────────────────────────
-@st.cache_data(ttl=5)
-def load_all_students(_base_url: str) -> dict:
-    """Load all students via GET /student. Returns raw dict keyed by ID."""
-    try:
-        return api("GET", "/student")
-    except ApiError:
-        return {}
+# ─── Client-side Validation ─────────────────────────────────────────────────────
+def validate_student_fields(data: dict, is_edit: bool = False, existing_ids: set = None) -> dict:
+    """Mirrors server validation rules client-side."""
+    errors = {}
+    sid = data.get("id", "").strip()
+    name = data.get("name", "").strip()
+    email = data.get("email", "").strip()
+    course = data.get("course", "").strip() if data.get("course") else ""
+    age = data.get("age")
+    marks = data.get("marks")
+
+    if not is_edit:
+        if not sid:
+            errors["id"] = "ID is required"
+        elif not re.match(r"^S\d+$", sid, re.IGNORECASE):
+            errors["id"] = "ID must be in format S### (e.g. S001)"
+        elif existing_ids and sid in existing_ids:
+            errors["id"] = "Student with this ID already exists"
+
+    if not name:
+        errors["name"] = "Name is required"
+    elif not re.match(r"^[A-Za-z\s]+$", name):
+        errors["name"] = "Name must contain only alphabets and spaces"
+    elif is_edit:
+        if len(name) < 2 or len(name) > 50:
+            errors["name"] = "Name must be 2–50 characters"
+    else:
+        if len(name) < 2 or len(name) > 100:
+            errors["name"] = "Name must be 2–100 characters"
+
+    if age is None:
+        errors["age"] = "Age is required"
+    elif is_edit:
+        if age <= 0 or age >= 100:
+            errors["age"] = "Age must be 1–99"
+    else:
+        if age <= 0 or age > 100:
+            errors["age"] = "Age must be 1–100"
+
+    if not course:
+        errors["course"] = "Course is required"
+    elif is_edit:
+        if len(course) > 50:
+            errors["course"] = "Course cannot exceed 50 characters"
+    else:
+        if len(course) < 2 or len(course) > 100:
+            errors["course"] = "Course must be 2–100 characters"
+
+    if marks is None or marks < 0 or marks > 100:
+        errors["marks"] = "Marks must be between 0 and 100"
+
+    if not email:
+        errors["email"] = "Email is required"
+    elif not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        errors["email"] = "Invalid email format"
+
+    return errors
 
 
-def load_data():
-    """Load all students and compute derived data."""
-    all_students = {}
+# ─── Load Global Data (GET /student) ────────────────────────────────────────────
+def load_all_data():
+    all_dict = {}
     try:
-        all_students = api("GET", "/student")
+        all_dict = api("GET", "/student")
         st.session_state.connected = True
     except ApiError:
         st.session_state.connected = False
         return {}, [], [], 0.0
 
-    students_list = dict_to_list(all_students)
-    courses = sorted(set(s.get("course", "") for s in students_list))
+    students_list = dict_to_list(all_dict)
+    courses = sorted(set(s.get("course", "") for s in students_list if s.get("course")))
     avg_marks = 0.0
     if students_list:
         avg_marks = sum(s.get("marks", 0) for s in students_list) / len(students_list)
-    return all_students, students_list, courses, avg_marks
+    return all_dict, students_list, courses, avg_marks
 
 
-# ─── Sidebar ─────────────────────────────────────────────────────────────────────
-with st.sidebar:
+all_students_dict, all_students_list, all_courses, class_avg = load_all_data()
+
+
+# ─── Dialogs ────────────────────────────────────────────────────────────────────
+@st.dialog("＋ New Student", width="large")
+def add_student_dialog():
+    next_id = get_next_id(all_students_dict)
+    existing_ids = set(all_students_dict.keys())
+
+    c1, c2 = st.columns(2)
+    with c1:
+        new_id = st.text_input("Student ID", value=next_id, placeholder="e.g. S001")
+    with c2:
+        new_name = st.text_input("Full Name", placeholder="e.g. Jane Doe")
+
+    c3, c4 = st.columns(2)
+    with c3:
+        new_email = st.text_input("Email", placeholder="e.g. jane@example.com")
+    with c4:
+        new_course = st.selectbox(
+            "Course",
+            options=all_courses,
+            index=None,
+            placeholder="Select or type course",
+            accept_new_options=True,
+        )
+
+    c5, c6 = st.columns(2)
+    with c5:
+        new_age = st.number_input("Age", min_value=1, max_value=100, value=20)
+    with c6:
+        new_marks = st.slider("Marks", 0, 100, 75)
+
+    # Live Grade Preview
+    grade = compute_grade(new_marks)
+    delta = new_marks - class_avg if class_avg > 0 else 0
+    delta_str = f"+{delta:.1f}" if delta >= 0 else f"{delta:.1f}"
+
     st.markdown(
-        f'<div style="font-family:\'Instrument Serif\',serif;font-size:1.5rem;color:{TOK_INK};">📘 Student <i style="color:{TOK_ACCENT};">Registry</i></div>',
+        f'<div style="font-family:\'Geist\',sans-serif;font-size:0.88rem;margin:10px 0;">'
+        f'Grade Preview: {grade_chip_html(grade)} '
+        f'<span style="color:{TOK_MUTED};font-size:0.82rem;">({delta_str} vs class average)</span>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
-    st.session_state.api_base = st.text_input(
+    data = {
+        "id": new_id,
+        "name": new_name,
+        "email": new_email,
+        "course": new_course or "",
+        "age": new_age,
+        "marks": new_marks,
+    }
+
+    errors = validate_student_fields(data, is_edit=False, existing_ids=existing_ids)
+
+    for fld, msg in errors.items():
+        st.caption(f"⚠️ **{fld.capitalize()}**: {msg}")
+
+    can_submit = len(errors) == 0
+
+    if st.button("Create Student", type="primary", disabled=not can_submit, width="stretch"):
+        body = {
+            "id": new_id.strip(),
+            "name": new_name.strip(),
+            "age": int(new_age),
+            "course": new_course.strip() if new_course else "",
+            "marks": int(new_marks),
+            "email": new_email.strip(),
+        }
+        try:
+            api("POST", "/create", body)
+            st.session_state.toast_msg = f"Student {new_id.strip()} created successfully!"
+            st.rerun()
+        except ApiError as e:
+            if e.fields:
+                for fld, msg in e.fields.items():
+                    st.error(f"**{fld}**: {msg}")
+            else:
+                st.error(e.message)
+
+
+@st.dialog("✏️ Edit Student", width="large")
+def edit_student_dialog(student: dict):
+    sid = student["id"]
+    orig = {k: v for k, v in student.items() if k != "id"}
+
+    st.markdown(
+        f'<div style="font-family:\'Geist Mono\',monospace;color:{TOK_MUTED};font-size:0.85rem;margin-bottom:12px;">'
+        f'Editing Record: <strong>{html.escape(sid)}</strong></div>',
+        unsafe_allow_html=True,
+    )
+
+    c1, c2 = st.columns(2)
+    with c1:
+        e_name = st.text_input("Name", value=orig.get("name", ""))
+    with c2:
+        e_email = st.text_input("Email", value=orig.get("email", ""))
+
+    course_options = list(all_courses)
+    cur_course = orig.get("course", "")
+    if cur_course and cur_course not in course_options:
+        course_options.insert(0, cur_course)
+    course_idx = course_options.index(cur_course) if cur_course in course_options else None
+
+    c3, c4 = st.columns(2)
+    with c3:
+        e_course = st.selectbox(
+            "Course",
+            options=course_options,
+            index=course_idx,
+            accept_new_options=True,
+        )
+    with c4:
+        e_age = st.number_input("Age", min_value=1, max_value=99, value=orig.get("age", 20))
+
+    e_marks = st.slider("Marks", 0, 100, orig.get("marks", 0))
+
+    # Calculate Changed Fields
+    changes = {}
+    if e_name.strip() != orig.get("name", ""):
+        changes["name"] = e_name.strip()
+    if e_email.strip() != orig.get("email", ""):
+        changes["email"] = e_email.strip()
+    if e_course and e_course.strip() != orig.get("course", ""):
+        changes["course"] = e_course.strip()
+    if e_age != orig.get("age", 0):
+        changes["age"] = int(e_age)
+    if e_marks != orig.get("marks", 0):
+        changes["marks"] = int(e_marks)
+
+    # Show Diff of Changed Fields
+    if changes:
+        st.markdown(
+            f'<div style="font-family:\'Geist\',sans-serif;font-size:0.82rem;color:{TOK_MUTED};margin:12px 0 4px 0;font-weight:600;">'
+            f'CHANGES DETECTED:</div>',
+            unsafe_allow_html=True,
+        )
+        for field_name, new_val in changes.items():
+            old_val = orig.get(field_name, "")
+            st.markdown(
+                f'<div style="font-family:\'Geist\',sans-serif;font-size:0.86rem;margin:2px 0;">'
+                f'<strong>{html.escape(field_name)}</strong>: '
+                f'<span class="diff-old">{html.escape(str(old_val))}</span> → '
+                f'<span class="diff-new">{html.escape(str(new_val))}</span>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+    else:
+        st.info("No fields changed.")
+
+    # Validation
+    full_data = {
+        "id": sid,
+        "name": e_name,
+        "email": e_email,
+        "course": e_course or "",
+        "age": e_age,
+        "marks": e_marks,
+    }
+    errors = validate_student_fields(full_data, is_edit=True)
+    for fld, msg in errors.items():
+        st.caption(f"⚠️ **{fld.capitalize()}**: {msg}")
+
+    can_save = len(changes) > 0 and len(errors) == 0
+
+    if st.button("Save Changes", type="primary", disabled=not can_save, width="stretch"):
+        try:
+            api("PUT", f"/update/{sid}", changes)
+            st.session_state.toast_msg = f"Student {sid} updated successfully!"
+            st.rerun()
+        except ApiError as e:
+            if e.fields:
+                for fld, msg in e.fields.items():
+                    st.error(f"**{fld}**: {msg}")
+            else:
+                st.error(e.message)
+
+
+@st.dialog("🗑️ Confirm Delete")
+def delete_student_dialog(student: dict):
+    sid = student["id"]
+    name = student.get("name", "Student")
+
+    st.markdown(
+        f'<p style="font-family:\'Geist\',sans-serif;color:{TOK_INK};font-size:0.95rem;">'
+        f'Are you sure you want to permanently delete <strong>{html.escape(name)}</strong> '
+        f'(<code style="font-family:\'Geist Mono\',monospace;">{html.escape(sid)}</code>)?'
+        f'</p>',
+        unsafe_allow_html=True,
+    )
+    st.warning("This action cannot be undone.")
+
+    confirm_input = st.text_input(
+        f"Type student ID '{sid}' to confirm deletion",
+        placeholder=sid,
+        autocomplete="off",
+    )
+
+    is_confirmed = confirm_input.strip() == sid
+
+    with st.container(key="delete_confirm_container"):
+        if st.button(
+            "🗑️ Delete Student",
+            type="primary",
+            disabled=not is_confirmed,
+            width="stretch",
+            key="delete_confirm_btn",
+        ):
+            try:
+                api("DELETE", f"/delete/{sid}")
+                st.session_state.toast_msg = f"Student {sid} deleted successfully!"
+                if st.session_state.selected_student_id == sid:
+                    st.session_state.selected_student_id = None
+
+                # Adjust page if this delete empties the current page
+                total_after = max(0, len(all_students_dict) - 1)
+                max_page = max(1, math.ceil(total_after / st.session_state.page_size))
+                if st.session_state.page > max_page:
+                    st.session_state.page = max_page
+
+                st.rerun()
+            except ApiError as e:
+                st.error(e.message)
+
+
+# ─── Sidebar ────────────────────────────────────────────────────────────────────
+with st.sidebar:
+    st.markdown(
+        f'<div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:1.6rem;color:{TOK_INK};margin-bottom:8px;">'
+        f'📘 Student <i style="color:{TOK_ACCENT};">Registry</i></div>',
+        unsafe_allow_html=True,
+    )
+
+    new_base = st.text_input(
         "API Base URL",
         value=st.session_state.api_base,
         placeholder="http://127.0.0.1:8000",
     )
+    if new_base.strip() != st.session_state.api_base:
+        st.session_state.api_base = new_base.strip()
+        st.session_state.page = 1
+        st.rerun()
 
-    # Status pill
+    # Connection Status Pill
     if st.session_state.connected:
         st.markdown(
             '<div class="status-pill"><span class="dot online"></span> Connected</div>',
@@ -529,49 +865,55 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-    if st.button("🔄 Refresh", width="stretch"):
-        load_all_students.clear()
+    if st.button("🔄 Refresh Data", width="stretch"):
         st.rerun()
 
     st.divider()
 
-    # Quick find
-    st.markdown(f'<p style="font-family:\'Geist\',sans-serif;font-size:0.88rem;color:{TOK_INK};font-weight:500;">Quick find</p>', unsafe_allow_html=True)
+    # Quick Find Section
+    st.markdown(
+        f'<p style="font-family:\'Geist\',sans-serif;font-size:0.88rem;color:{TOK_INK};font-weight:600;margin-bottom:6px;">'
+        f'Quick Find</p>',
+        unsafe_allow_html=True,
+    )
+
     with st.form("quick_find_form", clear_on_submit=False):
-        qf_id = st.text_input("Student ID", placeholder="e.g. S001", label_visibility="collapsed")
-        qf_submit = st.form_submit_button("Find", width="stretch")
+        qf_id = st.text_input("Enter Student ID", placeholder="e.g. S001", label_visibility="collapsed")
+        qf_submit = st.form_submit_button("Find Record", width="stretch")
 
     if qf_submit and qf_id.strip():
         try:
-            result = api("GET", f"/student/{qf_id.strip()}")
-            st.session_state.quick_find_result = {"id": qf_id.strip(), **result}
+            # SINGULAR PATH: /student/{id}
+            found = api("GET", f"/student/{qf_id.strip()}")
+            st.session_state.quick_find_result = {"id": qf_id.strip(), **found}
+            st.session_state.selected_student_id = qf_id.strip()
         except ApiError as e:
             st.error(e.message)
             st.session_state.quick_find_result = None
 
     if st.session_state.quick_find_result:
-        s = st.session_state.quick_find_result
-        grade = compute_grade(s.get("marks", 0))
+        q = st.session_state.quick_find_result
+        q_grade = compute_grade(q.get("marks", 0))
         st.markdown(
-            f'<div class="profile-panel">'
-            f'<div class="profile-name">{html.escape(s.get("name", ""))}</div>'
-            f'<div class="profile-id">{html.escape(s.get("id", ""))}</div>'
-            f'<div class="profile-field"><span class="profile-field-label">Course</span><br>{html.escape(s.get("course", ""))}</div>'
-            f'<div class="profile-field"><span class="profile-field-label">Marks</span><br>{s.get("marks", 0)} {grade_chip_html(grade)}</div>'
-            f'<div class="profile-field"><span class="profile-field-label">Age</span><br>{s.get("age", 0)}</div>'
-            f'<div class="profile-field"><span class="profile-field-label">Email</span><br>{html.escape(s.get("email", ""))}</div>'
+            f'<div class="profile-panel" style="padding:16px;margin-top:8px;">'
+            f'<div class="profile-name" style="font-size:1.4rem;">{html.escape(q.get("name", ""))}</div>'
+            f'<div class="profile-id">{html.escape(q.get("id", ""))}</div>'
+            f'<div class="profile-field"><span class="profile-field-label">Course:</span> {html.escape(q.get("course", ""))}</div>'
+            f'<div class="profile-field"><span class="profile-field-label">Marks:</span> {q.get("marks", 0)} {grade_chip_html(q_grade)}</div>'
+            f'<div class="profile-field"><span class="profile-field-label">Age:</span> {q.get("age", 0)}</div>'
+            f'<div class="profile-field"><span class="profile-field-label">Email:</span> {html.escape(q.get("email", ""))}</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
-        if st.button("✕ Clear", key="clear_qf"):
+        if st.button("✕ Clear Search", key="clear_qf_btn", width="stretch"):
             st.session_state.quick_find_result = None
             st.rerun()
 
     st.divider()
 
-    # Endpoints expander
-    with st.expander("📡 API Endpoints"):
-        endpoints = [
+    # Endpoints Used Expander
+    with st.expander("📡 Endpoints in Use"):
+        eps = [
             ("GET", "/student"),
             ("GET", "/student/{id}"),
             ("GET", "/filter?course=X"),
@@ -581,248 +923,47 @@ with st.sidebar:
             ("PUT", "/update/{id}"),
             ("DELETE", "/delete/{id}"),
         ]
-        for m, p in endpoints:
+        for m, p in eps:
             mc = METHOD_COLORS.get(m, TOK_MUTED)
             st.markdown(
-                f'<span class="mono-font" style="font-size:0.78rem;"><span style="color:{mc};font-weight:700;">{m}</span> {html.escape(p)}</span>',
+                f'<span style="font-family:\'Geist Mono\',monospace;font-size:0.78rem;">'
+                f'<strong style="color:{mc};">{m}</strong> {html.escape(p)}'
+                f'</span>',
                 unsafe_allow_html=True,
             )
 
 
-# ─── Main Data Load ──────────────────────────────────────────────────────────────
-all_students_dict, all_students_list, all_courses, class_avg = load_data()
-
-
-# ─── Dialogs ─────────────────────────────────────────────────────────────────────
-@st.dialog("Add Student", width="large")
-def add_student_dialog():
-    next_id = get_next_id(all_students_dict)
-    existing_ids = set(all_students_dict.keys())
-
-    c1, c2 = st.columns(2)
-    with c1:
-        new_id = st.text_input("Student ID", value=next_id)
-    with c2:
-        new_name = st.text_input("Full Name", placeholder="John Doe")
-
-    c3, c4 = st.columns(2)
-    with c3:
-        new_email = st.text_input("Email", placeholder="john@example.com")
-    with c4:
-        course_options = list(all_courses) if all_courses else []
-        new_course = st.selectbox("Course", options=course_options, index=None, placeholder="Select or type a course", accept_new_options=True)
-
-    c5, c6 = st.columns(2)
-    with c5:
-        new_age = st.number_input("Age", min_value=1, max_value=100, value=20)
-    with c6:
-        new_marks = st.slider("Marks", 0, 100, 50)
-
-    # Live grade preview
-    grade = compute_grade(new_marks)
-    delta = new_marks - class_avg if class_avg > 0 else 0
-    delta_str = f"+{delta:.1f}" if delta >= 0 else f"{delta:.1f}"
+# ─── Header ─────────────────────────────────────────────────────────────────────
+head_col, action_col = st.columns([4, 1])
+with head_col:
     st.markdown(
-        f'<div style="font-family:\'Geist\',sans-serif;font-size:0.9rem;margin:8px 0;">'
-        f'Grade preview: {grade_chip_html(grade)} '
-        f'<span style="color:{TOK_MUTED};font-size:0.82rem;">({delta_str} vs class avg)</span>'
-        f'</div>',
+        f'<div class="brand-heading">Student <em>Registry</em></div>'
+        f'<div class="brand-subtitle">A front desk for your FastAPI student records.</div>',
         unsafe_allow_html=True,
     )
-
-    # Validation
-    errors = {}
-    id_taken = False
-    if new_id.strip() in existing_ids:
-        id_taken = True
-        errors["id"] = "ID already taken"
-
-    if not new_id.strip():
-        errors["id"] = "ID is required"
-    if not new_name.strip():
-        errors["name"] = "Name is required"
-    if not new_email.strip():
-        errors["email"] = "Email is required"
-    if not new_course:
-        errors["course"] = "Course is required"
-
-    # Show inline errors
-    for fld, msg in errors.items():
-        st.caption(f"⚠️ **{fld}**: {msg}")
-
-    can_submit = len(errors) == 0
-
-    if st.button("Create Student", type="primary", disabled=not can_submit, width="stretch"):
-        body = {
-            "id": new_id.strip(),
-            "name": new_name.strip(),
-            "age": new_age,
-            "course": new_course.strip() if new_course else "",
-            "marks": new_marks,
-            "email": new_email.strip(),
-        }
-        try:
-            result = api("POST", "/create", body)
-            st.session_state.toast_msg = f"✅ Student {new_id.strip()} created!"
-            load_all_students.clear()
-            st.rerun()
-        except ApiError as e:
-            if e.fields:
-                for fld, msg in e.fields.items():
-                    st.error(f"**{fld}**: {msg}")
-            else:
-                st.error(e.message)
-
-
-@st.dialog("Edit Student", width="large")
-def edit_student_dialog(student: dict):
-    sid = student["id"]
-    original = {k: v for k, v in student.items() if k != "id"}
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f'<span class="mono-font" style="color:{TOK_MUTED};font-size:0.82rem;">Editing {html.escape(sid)}</span>', unsafe_allow_html=True)
-    with c2:
-        pass
-
-    e_name = st.text_input("Name", value=original.get("name", ""))
-    e_email = st.text_input("Email", value=original.get("email", ""))
-
-    course_options = list(all_courses) if all_courses else []
-    current_course = original.get("course", "")
-    if current_course and current_course not in course_options:
-        course_options.insert(0, current_course)
-    course_idx = course_options.index(current_course) if current_course in course_options else None
-    e_course = st.selectbox("Course", options=course_options, index=course_idx, accept_new_options=True)
-
-    c3, c4 = st.columns(2)
-    with c3:
-        e_age = st.number_input("Age", min_value=1, max_value=99, value=original.get("age", 20))
-    with c4:
-        e_marks = st.slider("Marks", 0, 100, original.get("marks", 0))
-
-    # Compute changes
-    changes = {}
-    if e_name.strip() != original.get("name", ""):
-        changes["name"] = e_name.strip()
-    if e_email.strip() != original.get("email", ""):
-        changes["email"] = e_email.strip()
-    if e_course and e_course.strip() != original.get("course", ""):
-        changes["course"] = e_course.strip()
-    if e_age != original.get("age", 0):
-        changes["age"] = e_age
-    if e_marks != original.get("marks", 0):
-        changes["marks"] = e_marks
-
-    # Show diff
-    if changes:
-        st.markdown(f'<p style="font-family:\'Geist\',sans-serif;font-size:0.82rem;color:{TOK_MUTED};margin-top:12px;">Changes:</p>', unsafe_allow_html=True)
-        for field_name, new_val in changes.items():
-            old_val = original.get(field_name, "")
-            st.markdown(
-                f'<div style="font-family:\'Geist\',sans-serif;font-size:0.88rem;margin:2px 0;">'
-                f'<strong>{html.escape(field_name)}</strong>: '
-                f'<span class="diff-old">{html.escape(str(old_val))}</span> → '
-                f'<span class="diff-new">{html.escape(str(new_val))}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-    else:
-        st.info("No changes made.")
-
-    if st.button("Save Changes", type="primary", disabled=len(changes) == 0, width="stretch"):
-        try:
-            result = api("PUT", f"/update/{sid}", changes)
-            st.session_state.toast_msg = f"✅ Student {sid} updated!"
-            load_all_students.clear()
-            st.rerun()
-        except ApiError as e:
-            if e.fields:
-                for fld, msg in e.fields.items():
-                    st.error(f"**{fld}**: {msg}")
-            else:
-                st.error(e.message)
-
-
-@st.dialog("Delete Student")
-def delete_student_dialog(student: dict):
-    sid = student["id"]
-    name = student.get("name", "Unknown")
-
-    st.markdown(
-        f'<p style="font-family:\'Geist\',sans-serif;color:{TOK_INK};">'
-        f'Are you sure you want to delete <strong>{html.escape(name)}</strong> ({html.escape(sid)})?</p>',
-        unsafe_allow_html=True,
-    )
-    st.warning("This action cannot be undone.")
-
-    confirm_id = st.text_input("Type the student ID to confirm", placeholder=sid)
-
-    with st.container(key="delete_confirm_container"):
-        if st.button(
-            "🗑️ Delete Student",
-            type="primary",
-            disabled=confirm_id.strip() != sid,
-            width="stretch",
-            key="delete_confirm_btn",
-        ):
-            try:
-                api("DELETE", f"/delete/{sid}")
-                st.session_state.toast_msg = f"🗑️ Student {sid} deleted."
-                load_all_students.clear()
-                st.rerun()
-            except ApiError as e:
-                st.error(e.message)
-
-    # Style the delete button red
-    st.markdown(
-        f"""<style>
-        [data-testid="stVerticalBlock"]:has(> div[data-testid="element-container"] > div[data-testid="stButton"] > button[kind="primary"][key="delete_confirm_btn"]) button[kind="primary"] {{
-            background-color: {TOK_DANGER};
-            border-color: {TOK_DANGER};
-        }}
-        div[key="delete_confirm_container"] button[kind="primary"] {{
-            background-color: {TOK_DANGER} !important;
-            border-color: {TOK_DANGER} !important;
-        }}
-        </style>""",
-        unsafe_allow_html=True,
-    )
-
-
-# ─── Header ──────────────────────────────────────────────────────────────────────
-header_l, header_r = st.columns([4, 1])
-with header_l:
-    st.markdown(
-        f'<div style="font-family:\'Instrument Serif\',serif;font-size:2.8rem;color:{TOK_INK};line-height:1.1;">'
-        f'Student <i style="color:{TOK_ACCENT};">Registry</i></div>'
-        f'<div style="font-family:\'Geist\',sans-serif;font-size:0.92rem;color:{TOK_MUTED};margin-top:2px;">'
-        f'A front desk for your FastAPI student records.</div>',
-        unsafe_allow_html=True,
-    )
-with header_r:
-    if st.button("＋ New student", type="primary", disabled=not st.session_state.connected, width="stretch"):
+with action_col:
+    if st.button(
+        "＋ New student",
+        type="primary",
+        disabled=not st.session_state.connected,
+        width="stretch",
+    ):
         add_student_dialog()
 
-
-# ─── Connection Error Banner ─────────────────────────────────────────────────────
+# Friendly Error Banner when API is unreachable
 if not st.session_state.connected and not all_students_dict:
     st.error("🔌 Can't reach the API. Is `uvicorn main:app --reload` running?")
 
-# ─── Stat Cards ──────────────────────────────────────────────────────────────────
+
+# ─── Stat Cards ─────────────────────────────────────────────────────────────────
 if all_students_list:
-    total = len(all_students_list)
-    n_courses = len(all_courses)
-    avg_m = class_avg
-    passing = sum(1 for s in all_students_list if s.get("marks", 0) >= 60)
+    total_cnt = len(all_students_list)
+    courses_cnt = len(all_courses)
+    passing_cnt = sum(1 for s in all_students_list if s.get("marks", 0) >= 60)
 
-    # Top scorer
-    top = max(all_students_list, key=lambda s: s.get("marks", 0))
-    top_name = top.get("name", "N/A")
-    top_marks = top.get("marks", 0)
-    top_course = top.get("course", "")
+    top_stu = max(all_students_list, key=lambda s: s.get("marks", 0))
 
-    # Grade spread
+    # Grade distribution counts
     grade_counts = {"A+": 0, "A": 0, "B": 0, "C": 0, "F": 0}
     for s in all_students_list:
         g = compute_grade(s.get("marks", 0))
@@ -834,8 +975,8 @@ if all_students_list:
         st.markdown(
             f'<div class="stat-card">'
             f'<div class="stat-label">Students</div>'
-            f'<div class="stat-value">{total}</div>'
-            f'<div class="stat-sub">across {n_courses} course{"s" if n_courses != 1 else ""}</div>'
+            f'<div class="stat-value">{total_cnt}</div>'
+            f'<div class="stat-sub">across {courses_cnt} course{"s" if courses_cnt != 1 else ""}</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -844,8 +985,8 @@ if all_students_list:
         st.markdown(
             f'<div class="stat-card">'
             f'<div class="stat-label">Class Average</div>'
-            f'<div class="stat-value">{avg_m:.1f}</div>'
-            f'<div class="stat-sub">{passing} of {total} passing (60+)</div>'
+            f'<div class="stat-value">{class_avg:.1f}</div>'
+            f'<div class="stat-sub">{passing_cnt} of {total_cnt} passing (60+)</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
@@ -854,80 +995,112 @@ if all_students_list:
         st.markdown(
             f'<div class="stat-card">'
             f'<div class="stat-label">Top Scorer</div>'
-            f'<div class="stat-value">{top_marks}</div>'
-            f'<div class="stat-sub">{html.escape(top_name)} · {html.escape(top_course)}</div>'
+            f'<div class="stat-value">{top_stu.get("marks", 0)}</div>'
+            f'<div class="stat-sub">{html.escape(top_stu.get("name", ""))} · {html.escape(top_stu.get("course", ""))}</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
 
     with sc4:
-        # Grade bar
-        bar_segments = ""
-        legend_parts = []
+        seg_html = ""
+        legend_html = []
         for g in ["A+", "A", "B", "C", "F"]:
             cnt = grade_counts[g]
+            pct = (cnt / total_cnt) * 100 if total_cnt > 0 else 0
             if cnt > 0:
-                pct = (cnt / total) * 100
-                bar_segments += f'<div class="grade-bar-segment" style="width:{pct}%%;background:{GRADE_COLORS[g]};"></div>'
-            legend_parts.append(f'{grade_chip_html(g)} <span style="font-size:0.78rem;color:{TOK_MUTED};">{cnt}</span>')
+                seg_html += f'<div class="grade-bar-segment" style="width:{pct}%%;background:{GRADE_COLORS[g]};"></div>'
+            legend_html.append(f'{grade_chip_html(g)} <span style="font-size:0.75rem;color:{TOK_MUTED};">{cnt}</span>')
 
         st.markdown(
             f'<div class="stat-card">'
             f'<div class="stat-label">Grade Spread</div>'
-            f'<div class="grade-bar">{bar_segments}</div>'
-            f'<div style="margin-top:8px;font-family:\'Geist\',sans-serif;font-size:0.82rem;">'
-            f'{" ".join(legend_parts)}'
+            f'<div class="grade-bar">{seg_html}</div>'
+            f'<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">'
+            f'{" ".join(legend_html)}'
             f'</div>'
             f'</div>',
             unsafe_allow_html=True,
         )
 
 
-# ─── Request Line ────────────────────────────────────────────────────────────────
+# ─── Request Line ───────────────────────────────────────────────────────────────
 render_request_line()
 
 
-# ─── Tabs ─────────────────────────────────────────────────────────────────────────
+# ─── Main Tabs ──────────────────────────────────────────────────────────────────
 tab_roster, tab_insights, tab_activity = st.tabs(["📋 Roster", "📊 Insights", "📝 Activity"])
 
 
-# ─── Roster Tab ──────────────────────────────────────────────────────────────────
+# ─── 1. Roster Tab ──────────────────────────────────────────────────────────────
 with tab_roster:
     if not all_students_dict:
         st.markdown(
-            f'<div class="empty-state"><div class="empty-icon">📭</div>No students found. Add one to get started!</div>',
+            f'<div class="empty-state">'
+            f'<div class="empty-icon">📭</div>'
+            f'<p>No students available. Make sure the FastAPI server is running or add your first student!</p>'
+            f'</div>',
             unsafe_allow_html=True,
         )
     else:
-        # Controls row
-        ctrl1, ctrl2 = st.columns([3, 1])
-        with ctrl1:
-            search_q = st.text_input("🔍 Search", placeholder="Search by name, email, or ID...", label_visibility="collapsed", key="search_input")
-            st.session_state.search_query = search_q
-        with ctrl2:
-            page_size = st.selectbox("Rows per page", [5, 10, 20, 50], index=[5, 10, 20, 50].index(st.session_state.page_size), label_visibility="collapsed")
-            st.session_state.page_size = page_size
+        # Search & Rows-per-page controls
+        ctrl_l, ctrl_r = st.columns([3, 1])
+        with ctrl_l:
+            search_val = st.text_input(
+                "Search",
+                placeholder="🔍 Search name, email, or ID…",
+                label_visibility="collapsed",
+                key="roster_search_input",
+            )
+            st.session_state.search_query = search_val
+        with ctrl_r:
+            page_sizes = [5, 10, 20, 50]
+            cur_psize_idx = page_sizes.index(st.session_state.page_size) if st.session_state.page_size in page_sizes else 1
+            psize_sel = st.selectbox(
+                "Rows per page",
+                options=page_sizes,
+                index=cur_psize_idx,
+                label_visibility="collapsed",
+                key="roster_page_size_sel",
+            )
+            st.session_state.page_size = psize_sel
 
-        # Course filter
-        course_filter = st.pills("Course", options=["All"] + all_courses, default="All", key="course_pills")
-        if course_filter == "All":
-            st.session_state.course_filter = None
-        else:
-            st.session_state.course_filter = course_filter
+        # Course filter using st.pills
+        pills_options = ["All"] + all_courses
+        cur_pills_default = st.session_state.course_filter if st.session_state.course_filter in all_courses else "All"
+        course_pill = st.pills("Course Filter", options=pills_options, default=cur_pills_default, key="course_pills_ctrl")
+        st.session_state.course_filter = None if course_pill == "All" else course_pill
 
-        # Sort controls
-        sort_c1, sort_c2, sort_c3 = st.columns([2, 2, 3])
-        with sort_c1:
-            sort_field = st.segmented_control("Sort by", options=["Marks", "Name", "Age"], default=st.session_state.sort_field, key="sort_field_ctrl")
-            st.session_state.sort_field = sort_field
-        with sort_c2:
-            sort_order = st.segmented_control("Order", options=["↑ Asc", "↓ Desc"], default=st.session_state.sort_order, key="sort_order_ctrl")
-            st.session_state.sort_order = sort_order
-        with sort_c3:
-            marks_range = st.slider("Marks range", 0, 100, st.session_state.marks_range, key="marks_range_slider")
-            st.session_state.marks_range = marks_range
+        # Sort-by segmented controls & Marks range slider
+        sort_col1, sort_col2, sort_col3 = st.columns([2, 2, 3])
+        with sort_col1:
+            sort_by_sel = st.segmented_control(
+                "Sort by",
+                options=["None", "Marks", "Name", "Age"],
+                default=st.session_state.sort_field or "None",
+                key="sort_by_segmented",
+            )
+            st.session_state.sort_field = None if sort_by_sel == "None" else sort_by_sel
 
-        # Reset page on filter changes
+        with sort_col2:
+            order_sel = st.segmented_control(
+                "Order",
+                options=["↑ Asc", "↓ Desc"],
+                default=st.session_state.sort_order,
+                key="sort_order_segmented",
+            )
+            st.session_state.sort_order = order_sel
+
+        with sort_col3:
+            marks_rng = st.slider(
+                "Marks range",
+                0,
+                100,
+                st.session_state.marks_range,
+                key="marks_range_filter",
+            )
+            st.session_state.marks_range = marks_rng
+
+        # Reset page on any control changes
         if (
             st.session_state.course_filter != st.session_state.prev_course_filter
             or st.session_state.sort_field != st.session_state.prev_sort_field
@@ -944,143 +1117,85 @@ with tab_roster:
             st.session_state.prev_page_size = st.session_state.page_size
             st.session_state.prev_marks_range = st.session_state.marks_range
 
-        # ── Data loading logic ──
-        course_sel = st.session_state.course_filter
-        sort_sel = st.session_state.sort_field
-        order_sel = st.session_state.sort_order
-        order_api = "asc" if order_sel == "↑ Asc" else "desc"
+        # ── Fetch Table Data according to 3-tier rules ──
+        c_filter = st.session_state.course_filter
+        s_field = st.session_state.sort_field
+        s_order = "asc" if st.session_state.sort_order == "↑ Asc" else "desc"
         sort_map = {"Marks": "marks", "Name": "name", "Age": "age"}
-        page = st.session_state.page
-        psize = st.session_state.page_size
-        mr = st.session_state.marks_range
+        page_num = st.session_state.page
+        page_limit = st.session_state.page_size
 
-        table_data = []
-        total_for_pagination = 0
-        api_error_msg = None
+        display_list = []
+        total_items = 0
+        error_msg = None
 
         try:
-            if course_sel:
-                # Use GET /filter
-                filtered_dict = api("GET", f"/filter?course={requests.utils.quote(course_sel)}")
-                table_data = dict_to_list(filtered_dict)
+            if c_filter:
+                # 1. Course selected -> GET /filter
+                f_dict = api("GET", f"/filter?course={requests.utils.quote(c_filter)}")
+                display_list = dict_to_list(f_dict)
+                if s_field:
+                    k = sort_map.get(s_field, "marks")
+                    display_list.sort(key=lambda s: s.get(k, ""), reverse=(s_order == "desc"))
 
-                # Apply local sort if sort field chosen
-                if sort_sel:
-                    sort_key = sort_map.get(sort_sel, "marks")
-                    reverse = order_api == "desc"
-                    table_data.sort(key=lambda s: s.get(sort_key, ""), reverse=reverse)
-
-            elif sort_sel:
-                # Use GET /sort
-                sort_key = sort_map.get(sort_sel, "marks")
-                table_data = api("GET", f"/sort?sort_by={sort_key}&order={order_api}")
+            elif s_field:
+                # 2. Sort field chosen (no course) -> GET /sort
+                k = sort_map.get(s_field, "marks")
+                display_list = api("GET", f"/sort?sort_by={k}&order={s_order}")
 
             else:
-                # Use GET /paginate (server-side)
-                pass  # handled below
+                # 3. Neither -> GET /paginate (server-side)
+                # If search or marks range active, use client dataset
+                if search_val.strip() or marks_rng != (0, 100):
+                    display_list = dict_to_list(all_students_dict)
+                else:
+                    pag_data = api("GET", f"/paginate?page={page_num}&limit={page_limit}")
+                    total_items = pag_data.get("total_students", 0)
+                    display_list = pag_data.get("students", [])
+
         except ApiError as e:
-            api_error_msg = e.message
+            error_msg = e.message
 
-        # Apply marks range filter
-        if course_sel or sort_sel:
-            table_data = [s for s in table_data if mr[0] <= s.get("marks", 0) <= mr[1]]
+        # Client-side filtering (Marks range + Search query)
+        if c_filter or s_field or search_val.strip() or marks_rng != (0, 100):
+            # Apply marks range
+            display_list = [s for s in display_list if marks_rng[0] <= s.get("marks", 0) <= marks_rng[1]]
 
-            # Apply search filter (client-side)
-            if search_q.strip():
-                sq = search_q.strip().lower()
-                table_data = [
-                    s for s in table_data
-                    if sq in s.get("name", "").lower()
-                    or sq in s.get("email", "").lower()
-                    or sq in s.get("id", "").lower()
+            # Apply client search query
+            if search_val.strip():
+                q = search_val.strip().lower()
+                display_list = [
+                    s for s in display_list
+                    if q in s.get("name", "").lower()
+                    or q in s.get("email", "").lower()
+                    or q in s.get("id", "").lower()
                 ]
 
-            total_for_pagination = len(table_data)
-            total_pages = max(1, math.ceil(total_for_pagination / psize))
+            total_items = len(display_list)
+            total_pages = max(1, math.ceil(total_items / page_limit))
+            if page_num > total_pages:
+                page_num = total_pages
+                st.session_state.page = page_num
 
-            # Adjust page if needed
-            if page > total_pages:
-                page = total_pages
-                st.session_state.page = page
-
-            start_idx = (page - 1) * psize
-            end_idx = start_idx + psize
-            page_data = table_data[start_idx:end_idx]
-
+            start_idx = (page_num - 1) * page_limit
+            end_idx = start_idx + page_limit
+            paginated_students = display_list[start_idx:end_idx]
         else:
-            # Server-side pagination
-            try:
-                pag_result = api("GET", f"/paginate?page={page}&limit={psize}")
-                page_data = pag_result.get("students", [])
-                total_for_pagination = pag_result.get("total_students", 0)
-                total_pages = max(1, math.ceil(total_for_pagination / psize))
+            total_pages = max(1, math.ceil(total_items / page_limit))
+            paginated_students = display_list
 
-                # Apply marks range filter client-side
-                if mr != (0, 100):
-                    # Need full data for marks filter, fall back
-                    table_data_full = dict_to_list(all_students_dict)
-                    table_data_full = [s for s in table_data_full if mr[0] <= s.get("marks", 0) <= mr[1]]
-                    if search_q.strip():
-                        sq = search_q.strip().lower()
-                        table_data_full = [
-                            s for s in table_data_full
-                            if sq in s.get("name", "").lower()
-                            or sq in s.get("email", "").lower()
-                            or sq in s.get("id", "").lower()
-                        ]
-                    total_for_pagination = len(table_data_full)
-                    total_pages = max(1, math.ceil(total_for_pagination / psize))
-                    if page > total_pages:
-                        page = total_pages
-                        st.session_state.page = page
-                    start_idx = (page - 1) * psize
-                    end_idx = start_idx + psize
-                    page_data = table_data_full[start_idx:end_idx]
-                elif search_q.strip():
-                    # Need full data for search, fall back
-                    sq = search_q.strip().lower()
-                    table_data_full = dict_to_list(all_students_dict)
-                    table_data_full = [
-                        s for s in table_data_full
-                        if sq in s.get("name", "").lower()
-                        or sq in s.get("email", "").lower()
-                        or sq in s.get("id", "").lower()
-                    ]
-                    total_for_pagination = len(table_data_full)
-                    total_pages = max(1, math.ceil(total_for_pagination / psize))
-                    if page > total_pages:
-                        page = total_pages
-                        st.session_state.page = page
-                    start_idx = (page - 1) * psize
-                    end_idx = start_idx + psize
-                    page_data = table_data_full[start_idx:end_idx]
-                else:
-                    if page > total_pages:
-                        page = total_pages
-                        st.session_state.page = page
-                        pag_result = api("GET", f"/paginate?page={page}&limit={psize}")
-                        page_data = pag_result.get("students", [])
+        if error_msg:
+            st.error(error_msg)
 
-            except ApiError as e:
-                api_error_msg = e.message
-                page_data = []
-                total_pages = 1
-
-        if api_error_msg:
-            st.error(api_error_msg)
-
-        # ── Table and Profile Panel ──
+        # ── Two-Column Layout: Table + Right-hand Profile Panel ──
         table_col, profile_col = st.columns([3, 2])
 
         with table_col:
-            if page_data:
-                import pandas as pd
-
-                # Build dataframe
-                df_rows = []
-                for s in page_data:
+            if paginated_students:
+                table_rows = []
+                for s in paginated_students:
                     grade = compute_grade(s.get("marks", 0))
-                    df_rows.append({
+                    table_rows.append({
                         "ID": s.get("id", ""),
                         "Name": s.get("name", ""),
                         "Course": s.get("course", ""),
@@ -1090,10 +1205,10 @@ with tab_roster:
                         "Email": s.get("email", ""),
                     })
 
-                df = pd.DataFrame(df_rows)
+                df = pd.DataFrame(table_rows)
 
-                # Unique key based on view params to reset selection
-                view_key = f"roster_{course_sel}_{sort_sel}_{order_sel}_{page}_{psize}_{search_q}_{mr}"
+                # Unique key resets selection when filter/page changes
+                view_key = f"roster_{c_filter}_{s_field}_{s_order}_{page_num}_{page_limit}_{search_val}_{marks_rng}"
 
                 column_config = {
                     "Marks": st.column_config.ProgressColumn(
@@ -1102,6 +1217,8 @@ with tab_roster:
                         max_value=100,
                         format="%d",
                     ),
+                    "ID": st.column_config.TextColumn("ID", width="small"),
+                    "Grade": st.column_config.TextColumn("Grade", width="small"),
                 }
 
                 event = st.dataframe(
@@ -1114,43 +1231,51 @@ with tab_roster:
                     width="stretch",
                 )
 
-                # Pagination controls
-                pg_c1, pg_c2, pg_c3 = st.columns([1, 3, 1])
-                with pg_c1:
-                    if st.button("← Prev", disabled=page <= 1, width="stretch"):
-                        st.session_state.page = page - 1
+                # Pager controls
+                pg1, pg2, pg3 = st.columns([1, 2, 1])
+                with pg1:
+                    if st.button("← Prev", disabled=page_num <= 1, width="stretch", key="btn_prev_pg"):
+                        st.session_state.page = max(1, page_num - 1)
                         st.rerun()
-                with pg_c2:
-                    start_row = (page - 1) * psize + 1
-                    end_row = min(page * psize, total_for_pagination)
+                with pg2:
+                    start_disp = (page_num - 1) * page_limit + 1 if total_items > 0 else 0
+                    end_disp = min(page_num * page_limit, total_items)
                     st.markdown(
-                        f'<div style="text-align:center;font-family:\'Geist\',sans-serif;font-size:0.85rem;color:{TOK_MUTED};padding:8px 0;">'
-                        f'{start_row}–{end_row} of {total_for_pagination} · page {page} of {total_pages}'
-                        f'</div>',
+                        f'<div style="text-align:center;font-family:\'Geist\',sans-serif;font-size:0.85rem;color:{TOK_MUTED};padding:6px 0;">'
+                        f'{start_disp}–{end_disp} of {total_items} · page {page_num} of {total_pages}</div>',
                         unsafe_allow_html=True,
                     )
-                with pg_c3:
-                    if st.button("Next →", disabled=page >= total_pages, width="stretch"):
-                        st.session_state.page = page + 1
+                with pg3:
+                    if st.button("Next →", disabled=page_num >= total_pages, width="stretch", key="btn_next_pg"):
+                        st.session_state.page = page_num + 1
                         st.rerun()
 
-                # Selected student
-                selected_rows = event.selection.rows if event and event.selection else []
+                # Get selected student from table selection
                 selected_student = None
-                if selected_rows:
-                    idx = selected_rows[0]
-                    if idx < len(page_data):
-                        selected_student = page_data[idx]
+                if event and event.selection and event.selection.rows:
+                    sel_idx = event.selection.rows[0]
+                    if sel_idx < len(paginated_students):
+                        selected_student = paginated_students[sel_idx]
+                        st.session_state.selected_student_id = selected_student.get("id")
+
+                elif st.session_state.selected_student_id:
+                    # Keep selected if in all_students_dict
+                    sid = st.session_state.selected_student_id
+                    if sid in all_students_dict:
+                        selected_student = {"id": sid, **all_students_dict[sid]}
 
             else:
                 st.markdown(
-                    f'<div class="empty-state"><div class="empty-icon">🔍</div>No students match your filters.</div>',
+                    f'<div class="empty-state">'
+                    f'<div class="empty-icon">🔍</div>'
+                    f'<p>No students match your filter criteria.</p>'
+                    f'</div>',
                     unsafe_allow_html=True,
                 )
                 selected_student = None
 
         with profile_col:
-            if page_data and selected_student:
+            if selected_student:
                 s = selected_student
                 s_name = html.escape(s.get("name", ""))
                 s_id = html.escape(s.get("id", ""))
@@ -1160,141 +1285,113 @@ with tab_roster:
                 s_age = s.get("age", 0)
                 s_email = html.escape(s.get("email", ""))
 
-                # Rank overall
-                sorted_all = sorted(all_students_list, key=lambda x: x.get("marks", 0), reverse=True)
-                rank_overall = 1
-                for i, stu in enumerate(sorted_all):
-                    if stu.get("id") == s.get("id"):
-                        rank_overall = i + 1
-                        break
+                # Ranks computation
+                sorted_overall = sorted(all_students_list, key=lambda x: x.get("marks", 0), reverse=True)
+                rank_overall = next((i + 1 for i, x in enumerate(sorted_overall) if x.get("id") == s.get("id")), 1)
 
-                # Rank in course
-                course_mates = [x for x in all_students_list if x.get("course") == s.get("course")]
-                course_mates_sorted = sorted(course_mates, key=lambda x: x.get("marks", 0), reverse=True)
-                rank_course = 1
-                for i, stu in enumerate(course_mates_sorted):
-                    if stu.get("id") == s.get("id"):
-                        rank_course = i + 1
-                        break
+                course_peers = [x for x in all_students_list if x.get("course") == s.get("course")]
+                sorted_course = sorted(course_peers, key=lambda x: x.get("marks", 0), reverse=True)
+                rank_course = next((i + 1 for i, x in enumerate(sorted_course) if x.get("id") == s.get("id")), 1)
 
-                # Course avg
-                course_avg = 0
-                if course_mates:
-                    course_avg = sum(x.get("marks", 0) for x in course_mates) / len(course_mates)
-
-                # Marks ring
-                pct = s_marks / 100
-                deg = pct * 360
+                # Conic gradient ring
                 ring_color = GRADE_COLORS.get(s_grade, TOK_ACCENT)
+                deg = (s_marks / 100) * 360
 
-                # vs class average bar
-                delta_val = s_marks - class_avg
-                delta_str = f"+{delta_val:.1f}" if delta_val >= 0 else f"{delta_val:.1f}"
-                delta_color = TOK_ACCENT if delta_val >= 0 else TOK_DANGER
+                # vs Class Average
+                delta = s_marks - class_avg
+                delta_str = f"+{delta:.1f}" if delta >= 0 else f"{delta:.1f}"
+                delta_color = TOK_ACCENT if delta >= 0 else TOK_DANGER
 
                 st.markdown(
                     f'<div class="profile-panel">'
                     f'<div class="profile-name">{s_name}</div>'
                     f'<div class="profile-id">{s_id}</div>'
                     f'<div class="marks-ring" style="background:conic-gradient({ring_color} {deg}deg, {TOK_LINE} {deg}deg);">'
-                    f'<div style="width:76px;height:76px;border-radius:50%%;background:{TOK_SURFACE};display:flex;align-items:center;justify-content:center;">'
-                    f'<span class="marks-value">{s_marks}</span></div></div>'
-                    f'<div style="text-align:center;margin:6px 0;">{grade_chip_html(s_grade)}</div>'
-                    f'<div style="text-align:center;font-family:\'Geist\',sans-serif;font-size:0.82rem;color:{TOK_MUTED};">'
+                    f'<div class="marks-ring-inner">'
+                    f'<span class="marks-value">{s_marks}</span>'
+                    f'<span class="marks-label">/ 100</span>'
+                    f'</div>'
+                    f'</div>'
+                    f'<div style="text-align:center;margin:4px 0 10px 0;">{grade_chip_html(s_grade)}</div>'
+                    f'<div style="text-align:center;font-family:\'Geist\',sans-serif;font-size:0.82rem;color:{TOK_MUTED};margin-bottom:14px;">'
                     f'Rank #{rank_overall} overall · #{rank_course} in {s_course}</div>'
-                    f'<hr style="border-color:{TOK_LINE};margin:14px 0;">'
+                    f'<hr style="border:none;border-top:1px solid {TOK_LINE};margin:12px 0;">'
                     f'<div class="profile-field"><span class="profile-field-label">Course</span><br>'
                     f'{course_dot_html(s.get("course", ""), all_courses)}{s_course}</div>'
-                    f'<div class="profile-field"><span class="profile-field-label">Age</span><br>{s_age}</div>'
+                    f'<div class="profile-field"><span class="profile-field-label">Age</span><br>{s_age} years old</div>'
                     f'<div class="profile-field"><span class="profile-field-label">Email</span><br>{s_email}</div>'
-                    f'<hr style="border-color:{TOK_LINE};margin:14px 0;">'
-                    f'<div style="font-family:\'Geist\',sans-serif;font-size:0.82rem;color:{TOK_MUTED};margin-bottom:4px;">vs Class Average</div>'
-                    f'<div style="display:flex;align-items:center;gap:8px;">'
+                    f'<hr style="border:none;border-top:1px solid {TOK_LINE};margin:12px 0;">'
+                    f'<div style="font-family:\'Geist\',sans-serif;font-size:0.78rem;color:{TOK_MUTED};font-weight:600;text-transform:uppercase;margin-bottom:6px;">vs Class Average</div>'
+                    f'<div style="display:flex;align-items:center;gap:10px;">'
                     f'<div style="flex:1;height:8px;background:{TOK_LINE};border-radius:4px;position:relative;">'
                     f'<div style="height:100%%;width:{min(s_marks, 100)}%%;background:{ring_color};border-radius:4px;"></div>'
                     f'<div style="position:absolute;top:-4px;left:{min(class_avg, 100)}%%;width:2px;height:16px;background:{TOK_MUTED};"></div>'
                     f'</div>'
-                    f'<span style="font-family:\'Geist\',sans-serif;font-size:0.82rem;color:{delta_color};font-weight:600;">{delta_str}</span>'
+                    f'<span style="font-family:\'Geist Mono\',monospace;font-size:0.84rem;color:{delta_color};font-weight:600;">{delta_str}</span>'
                     f'</div>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
 
-                btn_c1, btn_c2 = st.columns(2)
-                with btn_c1:
-                    if st.button("✏️ Edit", width="stretch", key="edit_btn"):
+                b_col1, b_col2 = st.columns(2)
+                with b_col1:
+                    if st.button("✏️ Edit", width="stretch", key="btn_edit_profile"):
                         edit_student_dialog(s)
-                with btn_c2:
-                    if st.button("🗑️ Delete", width="stretch", key="delete_btn"):
+                with b_col2:
+                    if st.button("🗑️ Delete", width="stretch", key="btn_delete_profile"):
                         delete_student_dialog(s)
             else:
                 st.markdown(
-                    f'<div class="empty-state" style="margin-top:40px;">'
+                    f'<div class="empty-state" style="margin-top:28px;">'
                     f'<div class="empty-icon">👈</div>'
-                    f'<div style="font-family:\'Geist\',sans-serif;color:{TOK_MUTED};">No one selected</div>'
-                    f'<div style="font-family:\'Geist\',sans-serif;font-size:0.82rem;color:{TOK_MUTED};margin-top:4px;">'
-                    f'Click a row in the table to view their profile.</div>'
+                    f'<div style="font-family:\'Instrument Serif\',Georgia,serif;font-size:1.6rem;color:{TOK_INK};">No one selected</div>'
+                    f'<p style="margin-top:4px;">Click any row in the table to view their full profile.</p>'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
 
 
-# ─── Insights Tab ────────────────────────────────────────────────────────────────
+# ─── 2. Insights Tab ────────────────────────────────────────────────────────────
 with tab_insights:
     if not all_students_list:
-        st.info("No student data available for insights.")
+        st.info("No student data available to visualize.")
     else:
-        import altair as alt
-        import pandas as pd
-
-        alt_ink = TOK_INK
-        alt_muted = TOK_MUTED
-        alt_accent = TOK_ACCENT
-        alt_bg = "transparent"
-
-        base_config = alt.Chart.configure_view(strokeWidth=0).configure_axis(
-            labelColor=alt_muted,
-            titleColor=alt_muted,
+        # Chart styling colors matching active theme
+        c_axis = alt.Axis(
+            labelColor=TOK_MUTED,
+            titleColor=TOK_MUTED,
             gridColor=TOK_LINE,
             domainColor=TOK_LINE,
             tickColor=TOK_LINE,
-        ).configure_legend(
-            labelColor=alt_muted,
-            titleColor=alt_muted,
-        ).configure_title(
-            color=alt_ink,
         )
 
-        # ── Average Marks by Course ──
-        st.markdown(f'<p style="font-family:\'Geist\',sans-serif;font-weight:600;color:{TOK_INK};margin-top:16px;">Average Marks by Course</p>', unsafe_allow_html=True)
+        # ── Chart 1: Average Marks by Course ──
+        st.markdown(
+            f'<div style="font-family:\'Geist\',sans-serif;font-size:1.05rem;font-weight:600;color:{TOK_INK};margin:14px 0 6px 0;">'
+            f'Average Marks by Course</div>',
+            unsafe_allow_html=True,
+        )
 
         course_avgs = []
         for c in all_courses:
-            mates = [s for s in all_students_list if s.get("course") == c]
-            if mates:
-                cavg = sum(s.get("marks", 0) for s in mates) / len(mates)
-                course_avgs.append({"Course": c, "Average Marks": round(cavg, 1)})
+            peers = [s for s in all_students_list if s.get("course") == c]
+            if peers:
+                avg = sum(s.get("marks", 0) for s in peers) / len(peers)
+                course_avgs.append({"Course": c, "Average Marks": round(avg, 1), "Students": len(peers)})
 
         if course_avgs:
             df_course = pd.DataFrame(course_avgs)
 
-            bars = alt.Chart(df_course).mark_bar(
-                cornerRadiusEnd=4,
-                color=alt_accent,
-            ).encode(
-                x=alt.X("Average Marks:Q", title="Average Marks"),
-                y=alt.Y("Course:N", sort="-x", title=""),
-                tooltip=["Course", "Average Marks"],
-                opacity=alt.condition(
-                    alt.selection_point(on="pointerover", fields=["Course"]),
-                    alt.value(1),
-                    alt.value(0.7),
-                ),
-            ).add_params(
-                alt.selection_point(on="pointerover", fields=["Course"])
-            )
+            hover_course = alt.selection_point(on="pointerover", fields=["Course"], empty=False)
 
-            rule = alt.Chart(pd.DataFrame({"avg": [class_avg]})).mark_rule(
+            bars = alt.Chart(df_course).mark_bar(cornerRadiusEnd=4).encode(
+                x=alt.X("Average Marks:Q", title="Average Marks", axis=c_axis),
+                y=alt.Y("Course:N", sort="-x", title="", axis=c_axis),
+                color=alt.condition(hover_course, alt.value(TOK_ACCENT), alt.value(TOK_LINE)),
+                tooltip=["Course", "Average Marks", "Students"],
+            ).add_params(hover_course)
+
+            class_avg_rule = alt.Chart(pd.DataFrame({"avg": [class_avg]})).mark_rule(
                 strokeDash=[6, 4],
                 color=TOK_DANGER,
                 strokeWidth=1.5,
@@ -1303,24 +1400,29 @@ with tab_insights:
                 tooltip=[alt.Tooltip("avg:Q", title="Class Average", format=".1f")],
             )
 
-            chart = (bars + rule).properties(height=max(200, len(course_avgs) * 40)).configure_view(strokeWidth=0).configure_axis(
-                labelColor=alt_muted, titleColor=alt_muted, gridColor=TOK_LINE, domainColor=TOK_LINE, tickColor=TOK_LINE,
-            )
-            st.altair_chart(chart, use_container_width=True)
+            chart1 = (bars + class_avg_rule).properties(
+                height=max(180, len(course_avgs) * 36)
+            ).configure_view(strokeWidth=0)
 
-        # ── Grade Distribution ──
-        st.markdown(f'<p style="font-family:\'Geist\',sans-serif;font-weight:600;color:{TOK_INK};margin-top:24px;">Grade Distribution</p>', unsafe_allow_html=True)
+            st.altair_chart(chart1, use_container_width=True)
+
+        # ── Chart 2: Grade Distribution ──
+        st.markdown(
+            f'<div style="font-family:\'Geist\',sans-serif;font-size:1.05rem;font-weight:600;color:{TOK_INK};margin:24px 0 6px 0;">'
+            f'Grade Distribution</div>',
+            unsafe_allow_html=True,
+        )
 
         grade_data = []
         for g in ["A+", "A", "B", "C", "F"]:
             cnt = sum(1 for s in all_students_list if compute_grade(s.get("marks", 0)) == g)
-            grade_data.append({"Grade": g, "Count": cnt, "Color": GRADE_COLORS[g]})
+            grade_data.append({"Grade": g, "Count": cnt})
 
         df_grade = pd.DataFrame(grade_data)
 
         grade_bars = alt.Chart(df_grade).mark_bar(cornerRadiusEnd=4).encode(
-            x=alt.X("Grade:N", sort=["A+", "A", "B", "C", "F"], title="Grade", axis=alt.Axis(labelAngle=0)),
-            y=alt.Y("Count:Q", title="Count"),
+            x=alt.X("Grade:N", sort=["A+", "A", "B", "C", "F"], title="Grade", axis=alt.Axis(labelAngle=0, labelColor=TOK_MUTED, titleColor=TOK_MUTED, domainColor=TOK_LINE)),
+            y=alt.Y("Count:Q", title="Number of Students", axis=c_axis),
             color=alt.Color("Grade:N", scale=alt.Scale(
                 domain=["A+", "A", "B", "C", "F"],
                 range=[GRADE_COLORS["A+"], GRADE_COLORS["A"], GRADE_COLORS["B"], GRADE_COLORS["C"], GRADE_COLORS["F"]],
@@ -1328,17 +1430,19 @@ with tab_insights:
             tooltip=["Grade", "Count"],
         )
 
-        grade_text = grade_bars.mark_text(dy=-10, fontSize=12, color=alt_muted).encode(
+        grade_labels = grade_bars.mark_text(dy=-10, fontSize=12, color=TOK_MUTED).encode(
             text="Count:Q",
         )
 
-        chart2 = (grade_bars + grade_text).properties(height=280).configure_view(strokeWidth=0).configure_axis(
-            labelColor=alt_muted, titleColor=alt_muted, gridColor=TOK_LINE, domainColor=TOK_LINE, tickColor=TOK_LINE,
-        )
+        chart2 = (grade_bars + grade_labels).properties(height=260).configure_view(strokeWidth=0)
         st.altair_chart(chart2, use_container_width=True)
 
-        # ── Age vs Marks Scatter ──
-        st.markdown(f'<p style="font-family:\'Geist\',sans-serif;font-weight:600;color:{TOK_INK};margin-top:24px;">Age vs Marks</p>', unsafe_allow_html=True)
+        # ── Chart 3: Age vs Marks Scatter Plot ──
+        st.markdown(
+            f'<div style="font-family:\'Geist\',sans-serif;font-size:1.05rem;font-weight:600;color:{TOK_INK};margin:24px 0 6px 0;">'
+            f'Age vs Marks</div>',
+            unsafe_allow_html=True,
+        )
 
         scatter_data = []
         for s in all_students_list:
@@ -1352,51 +1456,52 @@ with tab_insights:
 
         df_scatter = pd.DataFrame(scatter_data)
 
-        legend_sel = alt.selection_point(fields=["Course"], bind="legend")
+        legend_selection = alt.selection_point(fields=["Course"], bind="legend")
 
-        scatter = alt.Chart(df_scatter).mark_circle(size=80).encode(
-            x=alt.X("Age:Q", title="Age", scale=alt.Scale(zero=False)),
-            y=alt.Y("Marks:Q", title="Marks", scale=alt.Scale(domain=[0, 105])),
+        scatter = alt.Chart(df_scatter).mark_circle(size=90).encode(
+            x=alt.X("Age:Q", title="Age", scale=alt.Scale(zero=False), axis=c_axis),
+            y=alt.Y("Marks:Q", title="Marks", scale=alt.Scale(domain=[0, 105]), axis=c_axis),
             color=alt.Color("Course:N", scale=alt.Scale(
                 domain=all_courses,
                 range=COURSE_PALETTE[:len(all_courses)],
             )),
+            opacity=alt.condition(legend_selection, alt.value(0.9), alt.value(0.15)),
             tooltip=["Name", "Age", "Marks", "Course", "Grade"],
-            opacity=alt.condition(legend_sel, alt.value(0.85), alt.value(0.15)),
-        ).add_params(legend_sel).interactive()
+        ).add_params(legend_selection).interactive()
 
-        pass_line = alt.Chart(pd.DataFrame({"y": [60]})).mark_rule(
+        pass_rule = alt.Chart(pd.DataFrame({"y": [60]})).mark_rule(
             strokeDash=[6, 4],
             color=TOK_DANGER,
             strokeWidth=1.5,
         ).encode(
             y="y:Q",
-            tooltip=[alt.Tooltip("y:Q", title="Pass line")],
+            tooltip=[alt.Tooltip("y:Q", title="Pass Cutoff (60)")],
         )
 
-        chart3 = (scatter + pass_line).properties(height=360).configure_view(strokeWidth=0).configure_axis(
-            labelColor=alt_muted, titleColor=alt_muted, gridColor=TOK_LINE, domainColor=TOK_LINE, tickColor=TOK_LINE,
-        ).configure_legend(
-            labelColor=alt_muted, titleColor=alt_muted,
+        chart3 = (scatter + pass_rule).properties(height=340).configure_view(strokeWidth=0).configure_legend(
+            labelColor=TOK_MUTED,
+            titleColor=TOK_MUTED,
         )
         st.altair_chart(chart3, use_container_width=True)
 
 
-# ─── Activity Tab ────────────────────────────────────────────────────────────────
+# ─── 3. Activity Tab ────────────────────────────────────────────────────────────
 with tab_activity:
-    act_c1, act_c2 = st.columns([1, 1])
-    with act_c1:
-        if st.button("🗑️ Clear log", width="stretch"):
+    act_col1, act_col2 = st.columns([1, 1])
+    with act_col1:
+        if st.button("🗑️ Clear Log", width="stretch", key="btn_clear_log"):
             st.session_state.activity_log = []
             st.rerun()
-    with act_c2:
-        # Export CSV
+
+    with act_col2:
+        # Export CSV of all students with computed grade
         if all_students_list:
-            csv_buffer = io.StringIO()
-            writer = csv.DictWriter(csv_buffer, fieldnames=["id", "name", "age", "course", "marks", "email", "grade"])
+            csv_buf = io.StringIO()
+            fieldnames = ["id", "name", "age", "course", "marks", "email", "grade"]
+            writer = csv.DictWriter(csv_buf, fieldnames=fieldnames)
             writer.writeheader()
             for s in all_students_list:
-                row = {
+                writer.writerow({
                     "id": s.get("id", ""),
                     "name": s.get("name", ""),
                     "age": s.get("age", 0),
@@ -1404,27 +1509,42 @@ with tab_activity:
                     "marks": s.get("marks", 0),
                     "email": s.get("email", ""),
                     "grade": compute_grade(s.get("marks", 0)),
-                }
-                writer.writerow(row)
-            st.download_button("📥 Export CSV", csv_buffer.getvalue(), "students.csv", "text/csv", width="stretch")
+                })
+            st.download_button(
+                "📥 Export CSV",
+                csv_buf.getvalue(),
+                "students_registry.csv",
+                "text/csv",
+                width="stretch",
+                key="btn_download_csv",
+            )
         else:
-            st.download_button("📥 Export CSV", "", "students.csv", "text/csv", disabled=True, width="stretch")
+            st.download_button(
+                "📥 Export CSV",
+                "",
+                "students.csv",
+                "text/csv",
+                disabled=True,
+                width="stretch",
+            )
 
-    log = st.session_state.activity_log
-    if not log:
+    log_entries = st.session_state.activity_log
+    if not log_entries:
         st.markdown(
-            f'<div class="empty-state"><div class="empty-icon">📝</div>No API requests logged yet.</div>',
+            f'<div class="empty-state">'
+            f'<div class="empty-icon">📝</div>'
+            f'<p>No API requests recorded yet in this session.</p>'
+            f'</div>',
             unsafe_allow_html=True,
         )
     else:
-        import pandas as pd
-
         log_rows = []
-        for entry in log:
+        for entry in log_entries:
             log_rows.append({
                 "Time": entry["time"],
                 "Method": entry["method"],
                 "Path": entry["path"],
+                # Status cast to string to avoid PyArrow type mismatch
                 "Status": str(entry["status"]),
                 "ms": entry["ms"],
                 "OK": "✅" if entry["ok"] else "❌",
@@ -1432,4 +1552,3 @@ with tab_activity:
 
         df_log = pd.DataFrame(log_rows)
         st.dataframe(df_log, hide_index=True, width="stretch")
-
