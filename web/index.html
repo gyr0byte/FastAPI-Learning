@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Student Registry</title>
 
-  <!-- Google Fonts -->
+  <!-- Google Fonts: Instrument Serif, Geist, Geist Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -16,39 +16,38 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <!-- ═══════════════════════════════════════════
-       HEADER
-       ═══════════════════════════════════════════ -->
+  <!-- Header -->
   <header class="app-header">
-    <div class="header-brand">
+    <div class="brand">
       <h1 class="brand-title">Student <em>Registry</em></h1>
+      <p class="brand-subtitle">A front desk for your FastAPI student records.</p>
     </div>
 
     <div class="header-controls">
-      <!-- Connection field -->
-      <div class="connection-field" role="group" aria-label="API connection settings">
+      <!-- API Connection field -->
+      <div class="connection-box" role="group" aria-label="API Connection">
         <label for="api-url-input" class="sr-only">API Base URL</label>
         <input
           type="url"
           id="api-url-input"
           class="api-url-input"
-          placeholder="http://localhost:8000"
-          value="http://localhost:8000"
-          aria-label="API base URL"
+          placeholder="http://127.0.0.1:8000"
+          value="http://127.0.0.1:8000"
+          aria-label="API Base URL"
         />
         <span
-          id="connection-status-dot"
-          class="status-dot status-dot--unknown"
+          id="connection-dot"
+          class="connection-dot offline"
           role="status"
-          aria-label="Connection status: unknown"
-          title="Unknown"
+          aria-label="Connection status"
+          title="Checking connection..."
         ></span>
         <button
           type="button"
           id="btn-reconnect"
           class="btn btn-icon"
           aria-label="Reconnect to API"
-          title="Reconnect"
+          title="Reconnect to API"
         >
           ⟳
         </button>
@@ -57,107 +56,113 @@
       <!-- Theme toggle -->
       <button
         type="button"
-        id="btn-theme-toggle"
+        id="btn-theme"
         class="btn btn-icon theme-toggle"
-        aria-label="Toggle dark mode"
-        title="Toggle theme"
+        aria-label="Toggle color theme"
+        title="Toggle color theme"
       >
-        <span class="theme-icon-light" aria-hidden="true">☀</span>
-        <span class="theme-icon-dark" aria-hidden="true">☽</span>
+        ☀
       </button>
     </div>
   </header>
 
   <main class="app-main">
-    <!-- ═══════════════════════════════════════════
-         STATS SECTION
-         ═══════════════════════════════════════════ -->
-    <section class="stats-section" aria-label="Summary statistics">
-      <div class="stat-card" id="stat-students">
-        <span class="stat-label">Students</span>
-        <span class="stat-value" id="stat-students-value">—</span>
+    <!-- Stat Cards Section -->
+    <section class="stats-section" aria-label="Overview Statistics">
+      <div class="stat-card" id="card-students">
+        <div class="stat-label">Students</div>
+        <div class="stat-value" id="stat-students-count">—</div>
+        <div class="stat-sub" id="stat-students-sub">across 0 courses</div>
       </div>
 
-      <div class="stat-card" id="stat-average">
-        <span class="stat-label">Class Average</span>
-        <span class="stat-value" id="stat-average-value">—</span>
+      <div class="stat-card" id="card-average">
+        <div class="stat-label">Class Average</div>
+        <div class="stat-value" id="stat-avg-marks">—</div>
+        <div class="stat-sub" id="stat-avg-sub">0 of 0 passing (60+)</div>
       </div>
 
-      <div class="stat-card" id="stat-top-scorer">
-        <span class="stat-label">Top Scorer</span>
-        <span class="stat-value" id="stat-top-scorer-value">—</span>
+      <div class="stat-card" id="card-top-scorer">
+        <div class="stat-label">Top Scorer</div>
+        <div class="stat-value" id="stat-top-marks">—</div>
+        <div class="stat-sub" id="stat-top-sub">—</div>
       </div>
 
-      <div class="stat-card" id="stat-grade-spread">
-        <span class="stat-label">Grade Spread</span>
-        <div class="grade-spread-bar" id="stat-grade-spread-bar" role="img" aria-label="Grade distribution bar">
-          <!-- Segments filled by JS -->
-        </div>
+      <div class="stat-card" id="card-grade-spread">
+        <div class="stat-label">Grade Spread</div>
+        <div class="grade-bar" id="stat-grade-bar" role="img" aria-label="Grade distribution bar"></div>
+        <div class="grade-legend" id="stat-grade-legend"></div>
       </div>
     </section>
 
-    <!-- ═══════════════════════════════════════════
-         TOOLBAR
-         ═══════════════════════════════════════════ -->
-    <section class="toolbar" aria-label="Table controls">
-      <div class="toolbar-filters">
+    <!-- Toolbar Controls -->
+    <section class="toolbar" aria-label="Table Controls">
+      <div class="toolbar-left">
         <!-- Course filter -->
-        <div class="toolbar-group">
-          <label for="filter-course" class="sr-only">Filter by course</label>
+        <div class="toolbar-item">
+          <label for="filter-course" class="sr-only">Filter by Course</label>
           <select id="filter-course" class="select" aria-label="Filter by course">
             <option value="">All Courses</option>
-            <!-- Options populated by JS -->
           </select>
         </div>
 
-        <!-- Sort by -->
-        <div class="toolbar-group">
-          <label for="sort-by" class="sr-only">Sort by</label>
+        <!-- Sort field -->
+        <div class="toolbar-item">
+          <label for="sort-by" class="sr-only">Sort by Field</label>
           <select id="sort-by" class="select" aria-label="Sort by field">
+            <option value="">Default order</option>
             <option value="marks">Marks</option>
             <option value="name">Name</option>
             <option value="age">Age</option>
           </select>
         </div>
 
-        <!-- Asc / Desc segmented buttons -->
-        <div class="segmented-control" role="radiogroup" aria-label="Sort direction">
+        <!-- Asc / Desc segmented control -->
+        <div class="segmented-control" role="radiogroup" aria-label="Sort Direction">
           <button
             type="button"
-            class="seg-btn seg-btn--active"
             id="sort-asc"
+            class="seg-btn active"
             role="radio"
             aria-checked="true"
-            aria-label="Sort ascending"
           >
-            Asc
+            ↑ Asc
           </button>
           <button
             type="button"
-            class="seg-btn"
             id="sort-desc"
+            class="seg-btn"
             role="radio"
             aria-checked="false"
-            aria-label="Sort descending"
           >
-            Desc
+            ↓ Desc
           </button>
         </div>
 
-        <!-- Search / Find ID -->
-        <div class="toolbar-group toolbar-search">
-          <label for="search-input" class="sr-only">Search or find by ID</label>
+        <!-- Search / Quick find input -->
+        <div class="toolbar-item toolbar-search">
+          <label for="search-input" class="sr-only">Search or Find ID</label>
           <input
             type="text"
             id="search-input"
             class="input search-input"
-            placeholder="Search / Find ID…"
-            aria-label="Search students or find by ID"
+            placeholder="🔍 Search name, email, ID…"
+            aria-label="Search name, email, ID"
           />
+        </div>
+
+        <!-- Page size selector -->
+        <div class="toolbar-item">
+          <label for="page-size-select" class="sr-only">Rows per page</label>
+          <select id="page-size-select" class="select" aria-label="Rows per page">
+            <option value="5">5 / page</option>
+            <option value="10" selected>10 / page</option>
+            <option value="20">20 / page</option>
+            <option value="50">50 / page</option>
+          </select>
         </div>
       </div>
 
-      <div class="toolbar-actions">
+      <div class="toolbar-right">
         <button
           type="button"
           id="btn-new-student"
@@ -169,283 +174,257 @@
       </div>
     </section>
 
-    <!-- ═══════════════════════════════════════════
-         REQUEST LINE
-         ═══════════════════════════════════════════ -->
-    <div class="request-line" id="request-line" role="log" aria-label="Last API request info" aria-live="polite">
-      <span class="request-method" id="req-method"></span>
-      <span class="request-path" id="req-path"></span>
-      <span class="request-status" id="req-status"></span>
-      <span class="request-timing" id="req-timing"></span>
+    <!-- Request Line: shows last API call in mono font -->
+    <div
+      id="request-line"
+      class="request-line"
+      role="log"
+      aria-label="Last API request"
+      aria-live="polite"
+    >
+      <span class="req-left">
+        <span id="req-method" class="req-method">GET</span>
+        <span id="req-path" class="req-path">/student</span>
+      </span>
+      <span id="req-status" class="req-status status-ok">Ready</span>
     </div>
 
-    <!-- ═══════════════════════════════════════════
-         DATA TABLE
-         ═══════════════════════════════════════════ -->
-    <section class="table-section" aria-label="Student data">
+    <!-- Data Table Section -->
+    <section class="table-section" aria-label="Students Table">
       <div class="table-wrap">
         <table class="data-table" id="students-table">
           <thead>
             <tr>
-              <th scope="col">ID</th>
-              <th scope="col">Name</th>
-              <th scope="col">Course</th>
-              <th scope="col">Age</th>
-              <th scope="col">Marks</th>
-              <th scope="col">Grade</th>
-              <th scope="col">Email</th>
-              <th scope="col"><span class="sr-only">Actions</span></th>
+              <th scope="col" class="th-id">ID</th>
+              <th scope="col" class="th-name">Name</th>
+              <th scope="col" class="th-course">Course</th>
+              <th scope="col" class="th-age">Age</th>
+              <th scope="col" class="th-marks">Marks</th>
+              <th scope="col" class="th-grade">Grade</th>
+              <th scope="col" class="th-email">Email</th>
+              <th scope="col" class="th-actions"><span class="sr-only">Actions</span></th>
             </tr>
           </thead>
           <tbody id="students-tbody">
-            <!-- Rows populated by JS -->
+            <!-- Populated dynamically by app.js -->
           </tbody>
         </table>
       </div>
 
-      <!-- Empty state -->
-      <div class="table-empty" id="table-empty" hidden>
-        <p>No students found.</p>
-      </div>
-
-      <!-- Loading state -->
-      <div class="table-loading" id="table-loading" hidden>
-        <p>Loading…</p>
-      </div>
+      <!-- Pagination -->
+      <nav class="pager" aria-label="Pagination">
+        <button
+          type="button"
+          id="btn-prev-page"
+          class="btn btn-ghost"
+          aria-label="Previous page"
+          disabled
+        >
+          ← Prev
+        </button>
+        <span id="pager-info" class="pager-info" aria-live="polite">Page 1 of 1</span>
+        <button
+          type="button"
+          id="btn-next-page"
+          class="btn btn-ghost"
+          aria-label="Next page"
+          disabled
+        >
+          Next →
+        </button>
+      </nav>
     </section>
-
-    <!-- ═══════════════════════════════════════════
-         PAGER
-         ═══════════════════════════════════════════ -->
-    <nav class="pager" aria-label="Table pagination">
-      <button
-        type="button"
-        id="btn-prev-page"
-        class="btn btn-ghost"
-        aria-label="Previous page"
-        disabled
-      >
-        ← Prev
-      </button>
-      <span class="pager-info" id="pager-info" aria-live="polite">Page 1</span>
-      <button
-        type="button"
-        id="btn-next-page"
-        class="btn btn-ghost"
-        aria-label="Next page"
-        disabled
-      >
-        Next →
-      </button>
-    </nav>
   </main>
 
-  <!-- ═══════════════════════════════════════════
-       DRAWER (slides from right)
-       ═══════════════════════════════════════════ -->
+  <!-- Slide-in Drawer with Scrim -->
+  <div id="drawer-scrim" class="drawer-scrim" aria-hidden="true"></div>
   <aside
     id="drawer"
     class="drawer"
     role="dialog"
     aria-modal="true"
-    aria-label="Student details"
-    hidden
+    aria-labelledby="drawer-title"
+    aria-hidden="true"
   >
-    <!-- Scrim overlay -->
-    <div class="drawer-scrim" id="drawer-scrim" aria-hidden="true"></div>
-
     <div class="drawer-panel">
       <div class="drawer-header">
-        <h2 class="drawer-title" id="drawer-title">Student</h2>
+        <h2 id="drawer-title" class="drawer-title">Student Profile</h2>
         <button
           type="button"
           id="btn-drawer-close"
           class="btn btn-icon"
           aria-label="Close drawer"
+          title="Close"
         >
           ✕
         </button>
       </div>
 
       <div class="drawer-body">
-        <!-- ─── PROFILE VIEW ─── -->
-        <div class="profile-view" id="profile-view" hidden>
+        <!-- View Mode: Read-only Profile -->
+        <div id="drawer-view" class="drawer-view">
           <div class="profile-header">
-            <div class="profile-marks-ring" id="profile-marks-ring" aria-label="Marks visualization">
-              <svg class="marks-ring-svg" viewBox="0 0 120 120" aria-hidden="true">
-                <circle class="marks-ring-track" cx="60" cy="60" r="52" />
-                <circle class="marks-ring-fill" id="marks-ring-fill" cx="60" cy="60" r="52" />
-                <text class="marks-ring-text" id="marks-ring-text" x="60" y="60" dominant-baseline="central" text-anchor="middle"></text>
-              </svg>
-            </div>
-            <h3 class="profile-name" id="profile-name"></h3>
-            <span class="profile-id mono" id="profile-id"></span>
-            <span class="grade-chip profile-grade" id="profile-grade"></span>
+            <h3 id="profile-name" class="profile-name"></h3>
+            <div id="profile-id" class="profile-id mono"></div>
           </div>
 
-          <dl class="profile-details">
-            <div class="profile-detail-row">
-              <dt>Course</dt>
-              <dd>
-                <span class="course-dot" id="profile-course-dot" aria-hidden="true"></span>
-                <span id="profile-course"></span>
-              </dd>
+          <!-- Conic-gradient Marks Ring -->
+          <div class="marks-ring-container">
+            <div id="profile-marks-ring" class="marks-ring">
+              <div class="marks-ring-inner">
+                <span id="profile-marks-val" class="marks-val">0</span>
+                <span class="marks-label">/ 100</span>
+              </div>
             </div>
-            <div class="profile-detail-row">
+            <div id="profile-grade-chip" class="profile-grade-wrap"></div>
+          </div>
+
+          <div id="profile-rank" class="profile-rank"></div>
+
+          <!-- Profile Details List -->
+          <dl class="profile-details">
+            <div class="profile-row">
+              <dt>Course</dt>
+              <dd id="profile-course"></dd>
+            </div>
+            <div class="profile-row">
               <dt>Age</dt>
               <dd id="profile-age"></dd>
             </div>
-            <div class="profile-detail-row">
+            <div class="profile-row">
               <dt>Email</dt>
               <dd id="profile-email"></dd>
             </div>
-            <div class="profile-detail-row">
-              <dt>Rank</dt>
-              <dd id="profile-rank"></dd>
-            </div>
           </dl>
 
-          <div class="profile-actions">
-            <button
-              type="button"
-              id="btn-profile-edit"
-              class="btn btn-primary"
-              aria-label="Edit this student"
-            >
-              ✎ Edit
+          <!-- vs Class Average bar -->
+          <div class="vs-avg-container">
+            <div class="vs-avg-label">vs Class Average</div>
+            <div class="vs-avg-bar-wrap">
+              <div class="vs-avg-bar-bg">
+                <div id="profile-avg-bar-fill" class="vs-avg-bar-fill"></div>
+                <div id="profile-avg-marker" class="vs-avg-marker" title="Class average"></div>
+              </div>
+              <span id="profile-avg-delta" class="vs-avg-delta">+0.0</span>
+            </div>
+          </div>
+
+          <div class="drawer-footer-actions">
+            <button type="button" id="btn-profile-edit" class="btn btn-primary">
+              ✏️ Edit
             </button>
-            <button
-              type="button"
-              id="btn-profile-delete"
-              class="btn btn-danger"
-              aria-label="Delete this student"
-            >
-              🗑 Delete
+            <button type="button" id="btn-profile-delete" class="btn btn-danger">
+              🗑️ Delete
             </button>
           </div>
         </div>
 
-        <!-- ─── CREATE / EDIT FORM ─── -->
-        <form class="student-form" id="student-form" novalidate hidden>
+        <!-- Form Mode: Create / Edit -->
+        <form id="student-form" class="student-form" novalidate hidden>
           <!-- ID -->
-          <div class="form-field">
+          <div class="form-group">
             <label for="field-id">Student ID</label>
             <input
-              type="number"
+              type="text"
               id="field-id"
               name="id"
-              class="input"
-              placeholder="Auto-assigned or enter ID"
-              aria-describedby="field-id-error"
+              class="input mono"
+              placeholder="e.g. S001"
+              required
             />
-            <span class="field-error" id="field-id-error" role="alert"></span>
+            <span class="field-error" id="error-id" role="alert"></span>
           </div>
 
           <!-- Name -->
-          <div class="form-field">
-            <label for="field-name">Name</label>
+          <div class="form-group">
+            <label for="field-name">Full Name</label>
             <input
               type="text"
               id="field-name"
               name="name"
               class="input"
-              placeholder="Full name"
+              placeholder="e.g. John Doe"
               required
-              aria-describedby="field-name-error"
             />
-            <span class="field-error" id="field-name-error" role="alert"></span>
+            <span class="field-error" id="error-name" role="alert"></span>
           </div>
 
           <!-- Email -->
-          <div class="form-field">
+          <div class="form-group">
             <label for="field-email">Email</label>
             <input
               type="email"
               id="field-email"
               name="email"
               class="input"
-              placeholder="student@example.com"
+              placeholder="e.g. john@example.com"
               required
-              aria-describedby="field-email-error"
             />
-            <span class="field-error" id="field-email-error" role="alert"></span>
+            <span class="field-error" id="error-email" role="alert"></span>
           </div>
 
           <!-- Course (with datalist) -->
-          <div class="form-field">
+          <div class="form-group">
             <label for="field-course">Course</label>
             <input
               type="text"
               id="field-course"
               name="course"
               class="input"
-              placeholder="e.g. Mathematics"
-              list="courses-datalist"
+              placeholder="Select or enter course"
+              list="course-datalist"
               required
-              aria-describedby="field-course-error"
             />
-            <datalist id="courses-datalist">
-              <!-- Options populated by JS -->
+            <datalist id="course-datalist">
+              <!-- Populated dynamically -->
             </datalist>
-            <span class="field-error" id="field-course-error" role="alert"></span>
+            <span class="field-error" id="error-course" role="alert"></span>
           </div>
 
           <!-- Age -->
-          <div class="form-field">
+          <div class="form-group">
             <label for="field-age">Age</label>
             <input
               type="number"
               id="field-age"
               name="age"
               class="input"
-              placeholder="18"
               min="1"
-              max="120"
+              max="100"
+              value="20"
               required
-              aria-describedby="field-age-error"
             />
-            <span class="field-error" id="field-age-error" role="alert"></span>
+            <span class="field-error" id="error-age" role="alert"></span>
           </div>
 
-          <!-- Marks -->
-          <div class="form-field">
-            <label for="field-marks">Marks</label>
+          <!-- Marks (Slider + Number preview) -->
+          <div class="form-group">
+            <div class="form-label-row">
+              <label for="field-marks">Marks</label>
+              <div class="marks-slider-indicator">
+                <span id="field-marks-val" class="marks-number">50</span>
+                <span id="grade-preview-chip" class="grade-chip">C</span>
+                <span id="grade-delta-preview" class="marks-delta"></span>
+              </div>
+            </div>
             <input
-              type="number"
+              type="range"
               id="field-marks"
               name="marks"
-              class="input"
-              placeholder="0–100"
+              class="range-slider"
               min="0"
               max="100"
-              required
-              aria-describedby="field-marks-error"
+              value="50"
             />
-            <span class="field-error" id="field-marks-error" role="alert"></span>
+            <span class="field-error" id="error-marks" role="alert"></span>
           </div>
 
-          <!-- Live grade preview -->
-          <div class="form-field">
-            <span class="form-grade-label">Grade Preview</span>
-            <span class="grade-chip grade-chip--preview" id="grade-preview" aria-live="polite">—</span>
-          </div>
-
-          <!-- Form actions -->
+          <!-- Form Buttons -->
           <div class="form-actions">
-            <button
-              type="submit"
-              id="btn-form-submit"
-              class="btn btn-primary"
-              aria-label="Save student"
-            >
-              Create
+            <button type="submit" id="btn-form-submit" class="btn btn-primary" disabled>
+              Create Student
             </button>
-            <button
-              type="button"
-              id="btn-form-cancel"
-              class="btn btn-ghost"
-              aria-label="Cancel and close form"
-            >
+            <button type="button" id="btn-form-cancel" class="btn btn-ghost">
               Cancel
             </button>
           </div>
@@ -454,67 +433,48 @@
     </div>
   </aside>
 
-  <!-- ═══════════════════════════════════════════
-       DELETE CONFIRMATION DIALOG
-       ═══════════════════════════════════════════ -->
+  <!-- Delete Confirmation Modal Dialog -->
   <dialog id="delete-dialog" class="delete-dialog" aria-labelledby="delete-dialog-title">
-    <div class="dialog-content">
-      <h3 id="delete-dialog-title" class="dialog-title">⚠ Confirm Deletion</h3>
-      <p class="dialog-warning">
-        You are about to permanently delete
-        <strong id="delete-student-name"></strong>.
+    <div class="dialog-box">
+      <h3 id="delete-dialog-title" class="dialog-title">Delete Student</h3>
+      <p class="dialog-desc">
+        Are you sure you want to permanently delete
+        <strong id="delete-student-name"></strong>?
         This action cannot be undone.
       </p>
-      <div class="form-field">
+
+      <div class="form-group">
         <label for="delete-confirm-input">
-          Type the student ID <code id="delete-expected-id"></code> to confirm:
+          Type <code id="delete-expected-id" class="mono"></code> to confirm:
         </label>
         <input
           type="text"
           id="delete-confirm-input"
-          class="input"
-          placeholder="Enter student ID"
+          class="input mono"
+          placeholder="Type student ID here"
           autocomplete="off"
-          aria-describedby="delete-confirm-hint"
         />
-        <span class="field-hint" id="delete-confirm-hint">Must match exactly to enable deletion.</span>
       </div>
+
       <div class="dialog-actions">
-        <button
-          type="button"
-          id="btn-delete-cancel"
-          class="btn btn-ghost"
-          aria-label="Cancel deletion"
-        >
+        <button type="button" id="btn-delete-cancel" class="btn btn-ghost">
           Cancel
         </button>
-        <button
-          type="button"
-          id="btn-delete-confirm"
-          class="btn btn-danger"
-          aria-label="Confirm and delete student"
-          disabled
-        >
-          Delete
+        <button type="button" id="btn-delete-confirm" class="btn btn-danger" disabled>
+          🗑️ Delete Student
         </button>
       </div>
     </div>
   </dialog>
 
-  <!-- ═══════════════════════════════════════════
-       TOAST CONTAINER
-       ═══════════════════════════════════════════ -->
+  <!-- Toasts Container -->
   <div
-    class="toast-container"
     id="toast-container"
+    class="toast-container"
     role="region"
     aria-label="Notifications"
     aria-live="polite"
-  >
-    <!-- Toasts injected by JS -->
-  </div>
-
-  <!-- .sr-only utility: visually hidden but accessible to screen readers (defined in styles.css) -->
+  ></div>
 
   <script src="app.js"></script>
 </body>
