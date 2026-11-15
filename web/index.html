@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Student Registry</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Geist:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+    rel="stylesheet"
+  />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- ═══════════════════════════════════════════
+       HEADER
+       ═══════════════════════════════════════════ -->
+  <header class="app-header">
+    <div class="header-brand">
+      <h1 class="brand-title">Student <em>Registry</em></h1>
+    </div>
+
+    <div class="header-controls">
+      <!-- Connection field -->
+      <div class="connection-field" role="group" aria-label="API connection settings">
+        <label for="api-url-input" class="sr-only">API Base URL</label>
+        <input
+          type="url"
+          id="api-url-input"
+          class="api-url-input"
+          placeholder="http://localhost:8000"
+          value="http://localhost:8000"
+          aria-label="API base URL"
+        />
+        <span
+          id="connection-status-dot"
+          class="status-dot status-dot--unknown"
+          role="status"
+          aria-label="Connection status: unknown"
+          title="Unknown"
+        ></span>
+        <button
+          type="button"
+          id="btn-reconnect"
+          class="btn btn-icon"
+          aria-label="Reconnect to API"
+          title="Reconnect"
+        >
+          ⟳
+        </button>
+      </div>
+
+      <!-- Theme toggle -->
+      <button
+        type="button"
+        id="btn-theme-toggle"
+        class="btn btn-icon theme-toggle"
+        aria-label="Toggle dark mode"
+        title="Toggle theme"
+      >
+        <span class="theme-icon-light" aria-hidden="true">☀</span>
+        <span class="theme-icon-dark" aria-hidden="true">☽</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <!-- ═══════════════════════════════════════════
+         STATS SECTION
+         ═══════════════════════════════════════════ -->
+    <section class="stats-section" aria-label="Summary statistics">
+      <div class="stat-card" id="stat-students">
+        <span class="stat-label">Students</span>
+        <span class="stat-value" id="stat-students-value">—</span>
+      </div>
+
+      <div class="stat-card" id="stat-average">
+        <span class="stat-label">Class Average</span>
+        <span class="stat-value" id="stat-average-value">—</span>
+      </div>
+
+      <div class="stat-card" id="stat-top-scorer">
+        <span class="stat-label">Top Scorer</span>
+        <span class="stat-value" id="stat-top-scorer-value">—</span>
+      </div>
+
+      <div class="stat-card" id="stat-grade-spread">
+        <span class="stat-label">Grade Spread</span>
+        <div class="grade-spread-bar" id="stat-grade-spread-bar" role="img" aria-label="Grade distribution bar">
+          <!-- Segments filled by JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════
+         TOOLBAR
+         ═══════════════════════════════════════════ -->
+    <section class="toolbar" aria-label="Table controls">
+      <div class="toolbar-filters">
+        <!-- Course filter -->
+        <div class="toolbar-group">
+          <label for="filter-course" class="sr-only">Filter by course</label>
+          <select id="filter-course" class="select" aria-label="Filter by course">
+            <option value="">All Courses</option>
+            <!-- Options populated by JS -->
+          </select>
+        </div>
+
+        <!-- Sort by -->
+        <div class="toolbar-group">
+          <label for="sort-by" class="sr-only">Sort by</label>
+          <select id="sort-by" class="select" aria-label="Sort by field">
+            <option value="marks">Marks</option>
+            <option value="name">Name</option>
+            <option value="age">Age</option>
+          </select>
+        </div>
+
+        <!-- Asc / Desc segmented buttons -->
+        <div class="segmented-control" role="radiogroup" aria-label="Sort direction">
+          <button
+            type="button"
+            class="seg-btn seg-btn--active"
+            id="sort-asc"
+            role="radio"
+            aria-checked="true"
+            aria-label="Sort ascending"
+          >
+            Asc
+          </button>
+          <button
+            type="button"
+            class="seg-btn"
+            id="sort-desc"
+            role="radio"
+            aria-checked="false"
+            aria-label="Sort descending"
+          >
+            Desc
+          </button>
+        </div>
+
+        <!-- Search / Find ID -->
+        <div class="toolbar-group toolbar-search">
+          <label for="search-input" class="sr-only">Search or find by ID</label>
+          <input
+            type="text"
+            id="search-input"
+            class="input search-input"
+            placeholder="Search / Find ID…"
+            aria-label="Search students or find by ID"
+          />
+        </div>
+      </div>
+
+      <div class="toolbar-actions">
+        <button
+          type="button"
+          id="btn-new-student"
+          class="btn btn-primary"
+          aria-label="Add new student"
+        >
+          ＋ New student
+        </button>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════
+         REQUEST LINE
+         ═══════════════════════════════════════════ -->
+    <div class="request-line" id="request-line" role="log" aria-label="Last API request info" aria-live="polite">
+      <span class="request-method" id="req-method"></span>
+      <span class="request-path" id="req-path"></span>
+      <span class="request-status" id="req-status"></span>
+      <span class="request-timing" id="req-timing"></span>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         DATA TABLE
+         ═══════════════════════════════════════════ -->
+    <section class="table-section" aria-label="Student data">
+      <div class="table-wrap">
+        <table class="data-table" id="students-table">
+          <thead>
+            <tr>
+              <th scope="col">ID</th>
+              <th scope="col">Name</th>
+              <th scope="col">Course</th>
+              <th scope="col">Age</th>
+              <th scope="col">Marks</th>
+              <th scope="col">Grade</th>
+              <th scope="col">Email</th>
+              <th scope="col"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody id="students-tbody">
+            <!-- Rows populated by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty state -->
+      <div class="table-empty" id="table-empty" hidden>
+        <p>No students found.</p>
+      </div>
+
+      <!-- Loading state -->
+      <div class="table-loading" id="table-loading" hidden>
+        <p>Loading…</p>
+      </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════
+         PAGER
+         ═══════════════════════════════════════════ -->
+    <nav class="pager" aria-label="Table pagination">
+      <button
+        type="button"
+        id="btn-prev-page"
+        class="btn btn-ghost"
+        aria-label="Previous page"
+        disabled
+      >
+        ← Prev
+      </button>
+      <span class="pager-info" id="pager-info" aria-live="polite">Page 1</span>
+      <button
+        type="button"
+        id="btn-next-page"
+        class="btn btn-ghost"
+        aria-label="Next page"
+        disabled
+      >
+        Next →
+      </button>
+    </nav>
+  </main>
+
+  <!-- ═══════════════════════════════════════════
+       DRAWER (slides from right)
+       ═══════════════════════════════════════════ -->
+  <aside
+    id="drawer"
+    class="drawer"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Student details"
+    hidden
+  >
+    <!-- Scrim overlay -->
+    <div class="drawer-scrim" id="drawer-scrim" aria-hidden="true"></div>
+
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <h2 class="drawer-title" id="drawer-title">Student</h2>
+        <button
+          type="button"
+          id="btn-drawer-close"
+          class="btn btn-icon"
+          aria-label="Close drawer"
+        >
+          ✕
+        </button>
+      </div>
+
+      <div class="drawer-body">
+        <!-- ─── PROFILE VIEW ─── -->
+        <div class="profile-view" id="profile-view" hidden>
+          <div class="profile-header">
+            <div class="profile-marks-ring" id="profile-marks-ring" aria-label="Marks visualization">
+              <svg class="marks-ring-svg" viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="marks-ring-track" cx="60" cy="60" r="52" />
+                <circle class="marks-ring-fill" id="marks-ring-fill" cx="60" cy="60" r="52" />
+                <text class="marks-ring-text" id="marks-ring-text" x="60" y="60" dominant-baseline="central" text-anchor="middle"></text>
+              </svg>
+            </div>
+            <h3 class="profile-name" id="profile-name"></h3>
+            <span class="profile-id mono" id="profile-id"></span>
+            <span class="grade-chip profile-grade" id="profile-grade"></span>
+          </div>
+
+          <dl class="profile-details">
+            <div class="profile-detail-row">
+              <dt>Course</dt>
+              <dd>
+                <span class="course-dot" id="profile-course-dot" aria-hidden="true"></span>
+                <span id="profile-course"></span>
+              </dd>
+            </div>
+            <div class="profile-detail-row">
+              <dt>Age</dt>
+              <dd id="profile-age"></dd>
+            </div>
+            <div class="profile-detail-row">
+              <dt>Email</dt>
+              <dd id="profile-email"></dd>
+            </div>
+            <div class="profile-detail-row">
+              <dt>Rank</dt>
+              <dd id="profile-rank"></dd>
+            </div>
+          </dl>
+
+          <div class="profile-actions">
+            <button
+              type="button"
+              id="btn-profile-edit"
+              class="btn btn-primary"
+              aria-label="Edit this student"
+            >
+              ✎ Edit
+            </button>
+            <button
+              type="button"
+              id="btn-profile-delete"
+              class="btn btn-danger"
+              aria-label="Delete this student"
+            >
+              🗑 Delete
+            </button>
+          </div>
+        </div>
+
+        <!-- ─── CREATE / EDIT FORM ─── -->
+        <form class="student-form" id="student-form" novalidate hidden>
+          <!-- ID -->
+          <div class="form-field">
+            <label for="field-id">Student ID</label>
+            <input
+              type="number"
+              id="field-id"
+              name="id"
+              class="input"
+              placeholder="Auto-assigned or enter ID"
+              aria-describedby="field-id-error"
+            />
+            <span class="field-error" id="field-id-error" role="alert"></span>
+          </div>
+
+          <!-- Name -->
+          <div class="form-field">
+            <label for="field-name">Name</label>
+            <input
+              type="text"
+              id="field-name"
+              name="name"
+              class="input"
+              placeholder="Full name"
+              required
+              aria-describedby="field-name-error"
+            />
+            <span class="field-error" id="field-name-error" role="alert"></span>
+          </div>
+
+          <!-- Email -->
+          <div class="form-field">
+            <label for="field-email">Email</label>
+            <input
+              type="email"
+              id="field-email"
+              name="email"
+              class="input"
+              placeholder="student@example.com"
+              required
+              aria-describedby="field-email-error"
+            />
+            <span class="field-error" id="field-email-error" role="alert"></span>
+          </div>
+
+          <!-- Course (with datalist) -->
+          <div class="form-field">
+            <label for="field-course">Course</label>
+            <input
+              type="text"
+              id="field-course"
+              name="course"
+              class="input"
+              placeholder="e.g. Mathematics"
+              list="courses-datalist"
+              required
+              aria-describedby="field-course-error"
+            />
+            <datalist id="courses-datalist">
+              <!-- Options populated by JS -->
+            </datalist>
+            <span class="field-error" id="field-course-error" role="alert"></span>
+          </div>
+
+          <!-- Age -->
+          <div class="form-field">
+            <label for="field-age">Age</label>
+            <input
+              type="number"
+              id="field-age"
+              name="age"
+              class="input"
+              placeholder="18"
+              min="1"
+              max="120"
+              required
+              aria-describedby="field-age-error"
+            />
+            <span class="field-error" id="field-age-error" role="alert"></span>
+          </div>
+
+          <!-- Marks -->
+          <div class="form-field">
+            <label for="field-marks">Marks</label>
+            <input
+              type="number"
+              id="field-marks"
+              name="marks"
+              class="input"
+              placeholder="0–100"
+              min="0"
+              max="100"
+              required
+              aria-describedby="field-marks-error"
+            />
+            <span class="field-error" id="field-marks-error" role="alert"></span>
+          </div>
+
+          <!-- Live grade preview -->
+          <div class="form-field">
+            <span class="form-grade-label">Grade Preview</span>
+            <span class="grade-chip grade-chip--preview" id="grade-preview" aria-live="polite">—</span>
+          </div>
+
+          <!-- Form actions -->
+          <div class="form-actions">
+            <button
+              type="submit"
+              id="btn-form-submit"
+              class="btn btn-primary"
+              aria-label="Save student"
+            >
+              Create
+            </button>
+            <button
+              type="button"
+              id="btn-form-cancel"
+              class="btn btn-ghost"
+              aria-label="Cancel and close form"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════
+       DELETE CONFIRMATION DIALOG
+       ═══════════════════════════════════════════ -->
+  <dialog id="delete-dialog" class="delete-dialog" aria-labelledby="delete-dialog-title">
+    <div class="dialog-content">
+      <h3 id="delete-dialog-title" class="dialog-title">⚠ Confirm Deletion</h3>
+      <p class="dialog-warning">
+        You are about to permanently delete
+        <strong id="delete-student-name"></strong>.
+        This action cannot be undone.
+      </p>
+      <div class="form-field">
+        <label for="delete-confirm-input">
+          Type the student ID <code id="delete-expected-id"></code> to confirm:
+        </label>
+        <input
+          type="text"
+          id="delete-confirm-input"
+          class="input"
+          placeholder="Enter student ID"
+          autocomplete="off"
+          aria-describedby="delete-confirm-hint"
+        />
+        <span class="field-hint" id="delete-confirm-hint">Must match exactly to enable deletion.</span>
+      </div>
+      <div class="dialog-actions">
+        <button
+          type="button"
+          id="btn-delete-cancel"
+          class="btn btn-ghost"
+          aria-label="Cancel deletion"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          id="btn-delete-confirm"
+          class="btn btn-danger"
+          aria-label="Confirm and delete student"
+          disabled
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- ═══════════════════════════════════════════
+       TOAST CONTAINER
+       ═══════════════════════════════════════════ -->
+  <div
+    class="toast-container"
+    id="toast-container"
+    role="region"
+    aria-label="Notifications"
+    aria-live="polite"
+  >
+    <!-- Toasts injected by JS -->
+  </div>
+
+  <!-- .sr-only utility: visually hidden but accessible to screen readers (defined in styles.css) -->
+
+  <script src="app.js"></script>
+</body>
+</html>
