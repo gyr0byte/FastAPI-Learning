@@ -47,3 +47,15 @@ print("Table ready...")
 SessionLocal = sessionmaker(bind=engine)
 
 db = SessionLocal()
+
+if db.get(StudentDB, "S001") is None:
+    db.add(StudentDB(
+        id = "S001",
+        name = "Gaurav Dulal",
+        age = 20,
+        course = "AI",
+        marks = 94,
+        email = "gqurav69@gmail.com"
+    ))
+    
+    db.commit()
