@@ -10,6 +10,8 @@
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-%3E%3D3.10-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python Version"></a>
     <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-%3E%3D0.115.0-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI Version"></a>
     <a href="https://docs.pydantic.dev/"><img src="https://img.shields.io/badge/Pydantic-v2-E92063?style=flat-square&logo=pydantic&logoColor=white" alt="Pydantic Version"></a>
+    <a href="https://www.sqlalchemy.org/"><img src="https://img.shields.io/badge/SQLAlchemy-2.0-red?style=flat-square&logo=sqlalchemy&logoColor=white" alt="SQLAlchemy Version"></a>
+    <a href="https://www.postgresql.org/"><img src="https://img.shields.io/badge/PostgreSQL-Database-336791?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL"></a>
     <a href="https://streamlit.io/"><img src="https://img.shields.io/badge/Streamlit-%3E%3D1.50.0-FF4B4B?style=flat-square&logo=streamlit&logoColor=white" alt="Streamlit Version"></a>
   </p>
 
@@ -19,8 +21,9 @@
     <a href="#concept-index">Concept Index</a> •
     <a href="#concepts-in-detail">Concepts in Detail</a> •
     <a href="#pydantic-fundamentals">Pydantic Fundamentals</a> •
-    <a href="#quick-start">Quick Start</a> •
     <a href="#practice-project-student-registry">Practice Project</a> •
+    <a href="#postgresql-and-sqlalchemy-orm">PostgreSQL & SQLAlchemy</a> •
+    <a href="#quick-start">Quick Start</a> •
     <a href="#project-structure">Project Structure</a> •
     <a href="#progress-and-next-steps">Progress</a> •
     <a href="#known-limitations">Limitations</a> •
@@ -35,7 +38,7 @@
 
 This repository documents a personal learning journey building RESTful web services with FastAPI and Python. Created while following along with a comprehensive video tutorial, each file and commit reflects an incremental step in mastering core backend topics—starting with simple route decorators, progressing to path and query parameters, exploring Pydantic data modeling, and finally integrating CRUD operations with persistent storage.
 
-To put these backend principles into real-world practice, the repository also includes a complete **Student Registry** project powered by the learning API, complete with both an analytical Streamlit dashboard and a zero-build vanilla web interface.
+To put these backend principles into real-world practice, the repository also includes a complete **Student Registry** project powered by the learning API (with both Streamlit and vanilla web frontends), followed by an isolated deep dive into relational databases using **PostgreSQL** and **SQLAlchemy 2.0 ORM** to prepare for full database-backed APIs.
 
 > [!NOTE]
 > This is primarily an educational codebase built to master FastAPI concepts through practical experimentation.
@@ -62,6 +65,7 @@ flowchart TD
     I --> J["10. Resource Deletion"]
     J --> K["11. CORS Middleware"]
     K --> L["12. Full-Stack Frontends"]
+    L --> M["13. PostgreSQL & SQLAlchemy ORM"]
 ```
 
 <sub><a href="#fastapi-learning-journey">↑ Back to top</a></sub>
