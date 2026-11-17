@@ -58,4 +58,8 @@ if db.get(StudentDB, "S001") is None:
         email = "gqurav69@gmail.com"
     ))
     
-    db.commit()
+    db.commit() 
+    
+# Read it back
+for i in db.query(StudentDB).all():
+    print(f"ID: {i.id}, Name: {i.name}, Age: {i.age}, Course: {i.course}, Marks: {i.marks}, Email: {i.email}")
