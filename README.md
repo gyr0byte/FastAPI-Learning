@@ -411,6 +411,21 @@ To run the Streamlit frontend, install its specific client libraries:
 pip install "streamlit>=1.50.0" pandas altair requests
 ```
 
+### 4. (Optional) Database Setup for PostgreSQL Playground
+
+To run the PostgreSQL and SQLAlchemy playground script:
+
+```powershell
+# Copy the environment template
+cp .env.example .env
+
+# Configure DATABASE_URL in .env with your PostgreSQL credentials:
+# DATABASE_URL="postgresql://user:password@localhost:5432/dbname"
+
+# Install database dependencies
+pip install sqlalchemy python-dotenv psycopg2-binary
+```
+
 <sub><a href="#fastapi-learning-journey">↑ Back to top</a></sub>
 
 ---
@@ -502,19 +517,128 @@ flowchart LR
 
 ---
 
+## PostgreSQL and SQLAlchemy ORM
+
+To transition from flat-file storage toward production-grade persistence, the repository explores relational database management and object-relational mapping (ORM) in [`FastAPIandPostgres/playground.py`](FastAPIandPostgres/playground.py). 
+
+This script intentionally isolates the database layer to test direct communication with PostgreSQL using **SQLAlchemy 2.0** before wiring sessions and models into FastAPI route handlers.
+
+### Key Concepts Explored
+
+1. **Environment Configuration (`python-dotenv`):**
+   - Keeps credentials out of source control using `.env` (with a sample template provided in [`.env.example`](.env.example)).
+   - Reads `DATABASE_URL` dynamically using `os.getenv("DATABASE_URL")`.
+
+2. **Connection & Engine (`create_engine`):**
+   - Creates the engine ("the road to the database") and executes a raw verification query (`SELECT version();`) inside a context-managed connection.
+
+3. **Declarative ORM Modeling (`DeclarativeBase`):**
+   - Defines a `StudentDB` class inheriting from SQLAlchemy's modern `DeclarativeBase`.
+   - Maps class attributes to the `student_records` table with explicit column types, constraints, and keys:
+     - `id`: String primary key (e.g. `"S001"`).
+     - `name`: String (length 50, `nullable=False`).
+     - `age`: Integer (`nullable=False`).
+     - `course`: String (length 50, `nullable=False`).
+     - `marks`: Integer (`nullable=False`).
+     - `email`: String (`unique=True`, `nullable=False`).
+
+4. **Schema Migration & Table Creation (`Base.metadata.create_all`):**
+   - Binds to the engine and issues `CREATE TABLE IF NOT EXISTS` statements automatically.
+
+5. **Session Management & CRUD Operations (`sessionmaker`):**
+   - **Session Lifecycle:** `SessionLocal = sessionmaker(bind=engine)` creates scoped sessions for database transactions.
+   - **Create (Insert):** Adds a record via `db.add(StudentDB(...))` and saves with `db.commit()` only if the record doesn't already exist (`if db.get(StudentDB, "S001") is None:`).
+   - **Read (Query):** Queries all records using `db.query(StudentDB).all()`.
+   - **Update (Mutate):** Retrieves an entity by primary key using `db.get(StudentDB, "S001")`, modifies attributes in Python (`gaurav.marks = 95`), and persists the change with `db.commit()`.
+
+### Code Walkthrough
+
+```python
+import os
+from dotenv import load_dotenv
+from sqlalchemy import Column, Integer, String, create_engine, text
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
+
+# Step 1: Load environment variables
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+# Step 2: Create engine & test connection
+engine = create_engine(DATABASE_URL)
+with engine.connect() as connection:
+    version = connection.execute(text("SELECT version();")).scalar()
+    print(f"Connected to PostgreSQL: {version.split(',')[0]}")
+
+# Step 3: Define Declarative ORM model
+class Base(DeclarativeBase):
+    pass
+
+class StudentDB(Base):
+    __tablename__ = "student_records"
+    id      = Column(String, primary_key=True)
+    name    = Column(String(50), nullable=False)
+    age     = Column(Integer, nullable=False)
+    course  = Column(String(50), nullable=False)
+    marks   = Column(Integer, nullable=False)
+    email   = Column(String, unique=True, nullable=False)
+
+# Create table schema
+Base.metadata.create_all(bind=engine)
+
+# Step 4: Session operations (Create & Update)
+SessionLocal = sessionmaker(bind=engine)
+db = SessionLocal()
+
+if db.get(StudentDB, "S001") is None:
+    db.add(StudentDB(
+        id="S001", name="Gaurav Dulal", age=20,
+        course="AI", marks=94, email="gqurav69@gmail.com"
+    ))
+    db.commit()
+
+# Mutate and commit update
+gaurav = db.get(StudentDB, "S001")
+gaurav.marks = 95
+db.commit()
+print(f"Updated Marks for {gaurav.name}: {gaurav.marks}")
+```
+
+### Running the Database Playground
+
+```powershell
+# 1. Create .env from template
+cp .env.example .env
+
+# 2. Configure DATABASE_URL in .env:
+# DATABASE_URL="postgresql://username:password@localhost:5432/fastapi_db"
+
+# 3. Run the playground script:
+python FastAPIandPostgres/playground.py
+```
+
+> [!TIP]
+> **Learning Strategy:** Practicing SQLAlchemy in a standalone script before introducing FastAPI's `Depends` dependency injection simplifies debugging and ensures the database connection, ORM mappings, and transaction flows work independently.
+
+<sub><a href="#fastapi-learning-journey">↑ Back to top</a></sub>
+
+---
+
 ## Project Structure
 
 ```text
 FastAPI-Learning/
-├── main.py              # FastAPI service: endpoints, Pydantic models, CORS, and persistence
-├── app.py               # Streamlit dashboard: analytics, roster management, and modal dialogs
-├── pydantic_basics.py   # Standalone teaching script: 7-step Pydantic fundamentals walkthrough
-├── students.json        # Flat JSON storage: student records keyed by student ID
-├── pyproject.toml       # Project configuration: Python version and package dependencies
-├── LICENSE              # MIT License
-├── README.md            # Comprehensive learning documentation and API reference
+├── main.py                          # FastAPI service: endpoints, Pydantic models, CORS, and persistence
+├── app.py                           # Streamlit dashboard: analytics, roster management, and modal dialogs
+├── pydantic_basics.py               # Standalone teaching script: 7-step Pydantic fundamentals walkthrough
+├── students.json                    # Flat JSON storage: student records keyed by student ID
+├── .env.example                     # Example environment configuration for database credentials
+├── pyproject.toml                   # Project configuration: Python version and package dependencies
+├── LICENSE                          # MIT License
+├── README.md                        # Comprehensive learning documentation and API reference
 ├── assets/
-│   └── banner.svg       # Custom hand-crafted repository header banner
+│   └── banner.svg                   # Custom hand-crafted repository header banner
+├── FastAPIandPostgres/
+│   └── playground.py                # Standalone SQLAlchemy 2.0 & PostgreSQL CRUD playground script
 └── web/
     ├── index.html       # Vanilla HTML semantic structure for web UI
     ├── styles.css       # Complete responsive CSS styles, design tokens, and theme rules
@@ -543,10 +667,11 @@ FastAPI-Learning/
 - [x] Cross-Origin Resource Sharing (CORS) with `CORSMiddleware`
 - [x] Analytical frontend with Streamlit, Altair, and `@st.dialog`
 - [x] Zero-build vanilla web frontend with HTML5 `<dialog>` and sliding drawer
+- [x] PostgreSQL database integration & SQLAlchemy 2.0 ORM playground (engine connection, DeclarativeBase modeling, table creation, and session CRUD)
 
 ### Ideas for Next Steps
 
-- [ ] **Database Migration**: Replace `students.json` with SQLite and SQLAlchemy or SQLModel for transactional safety.
+- [ ] **Database Integration in FastAPI**: Wire SQLAlchemy database sessions into FastAPI route handlers using dependency injection (`Depends`) to replace flat-file JSON persistence in `main.py`.
 - [ ] **User Authentication**: Implement JWT token authentication and password hashing using OAuth2 password flow.
 - [ ] **Automated Testing**: Write unit and integration test suites using `pytest` and `httpx.AsyncClient`.
 - [ ] **Containerization**: Add a `Dockerfile` and `docker-compose.yml` for unified one-command deployment.
@@ -557,7 +682,7 @@ FastAPI-Learning/
 
 ## Known Limitations
 
-1. **File-Based Concurrency**: Storage relies on `students.json` without file locking. Concurrent write requests can result in race conditions or partial file overwrites.
+1. **File-Based Concurrency in Main API**: The primary FastAPI service ([main.py](main.py)) still relies on `students.json` without file locking. PostgreSQL and SQLAlchemy integration has begun in [FastAPIandPostgres/playground.py](FastAPIandPostgres/playground.py) and is slated to be wired into `main.py` in the next phase.
 2. **Wildcard CORS Configuration**: The API is configured with `allow_origins=["*"]`, which is suitable for local development but too permissive for production environments.
 3. **Model Validation Asymmetry**: Validation bounds differ between `Student` and `StudentUpdate` in [main.py](main.py):
    - `name`: max 100 characters on create vs. max 50 on update.
