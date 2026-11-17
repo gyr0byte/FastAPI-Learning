@@ -61,5 +61,11 @@ if db.get(StudentDB, "S001") is None:
     db.commit() 
     
 # Read it back
-for i in db.query(StudentDB).all():
-    print(f"ID: {i.id}, Name: {i.name}, Age: {i.age}, Course: {i.course}, Marks: {i.marks}, Email: {i.email}")
+# for i in db.query(StudentDB).all():
+    # print(f"ID: {i.id}, Name: {i.name}, Age: {i.age}, Course: {i.course}, Marks: {i.marks}, Email: {i.email}")
+
+# Update a record
+gaurav = db.get(StudentDB, "S001")
+gaurav.marks = 95
+db.commit()
+print(f"Updated Marks for {gaurav.name}: {gaurav.marks}")
