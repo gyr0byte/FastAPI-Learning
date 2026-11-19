@@ -86,5 +86,15 @@ def get_db():
     
     
 # Part 8: Create the FastAPI app
-from fastapi import FastAPI
+from fastapi import FastAPI, Path, Query, Depends
+from sqlalchemy.orm import Session
 app = FastAPI()
+
+
+# Part 9: GET one student
+@app.get("/students/{student_id}")
+def get_student(
+    student_id : str = Path(..., description="The ID of the student to retrieve"),
+    db : Session = Depends(get_db) # This is the session that will be used to query the database
+):
+    student = db.get(StudentDB, student_id)
