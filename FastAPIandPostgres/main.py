@@ -74,6 +74,9 @@ class StudentUpdate(BaseModel): # Pydantic Model
 
 # Part 7: getdb() - One session per request
 # Opens a session, gives it to the endpoint, always closes it, replaces load_data/save_data
+
+# Opens a session, pauses at yield while the endpoint runs, then closes the session after the 
+# endpoint is done
 def get_db():
     db = SessionLocal()
     try:
@@ -81,3 +84,7 @@ def get_db():
     finally:
         db.close()
     
+    
+# Part 8: Create the FastAPI app
+from fastapi import FastAPI
+app = FastAPI()
