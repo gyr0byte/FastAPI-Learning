@@ -40,7 +40,8 @@ print("Table ready...")
 
 
 # Part 5: Pydantic schemas for input (StudentCreate, StudentUpdate)
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+from fastapi import HTTPException
 
 class StudentCreate(BaseModel): # Pydantic Model
     id      : str = Field(..., description="Unique identifier for the student")
@@ -49,3 +50,12 @@ class StudentCreate(BaseModel): # Pydantic Model
     email   : str = Field(..., description="Email of the student")
     course  : str = Field(..., min_length=2, max_length=50, description="Course of the student")
     marks   : int = Field(..., ge=0, le=100, description="Marks of the student")
+
+
+
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, value):
+        if not value.replace(" ", "").isalpha():
+            raise HTTPException(status_code=400, detail="Name must contain only alphabetic characters and spaces")
+        return value.title()  # Capitalize the first letter of each word
