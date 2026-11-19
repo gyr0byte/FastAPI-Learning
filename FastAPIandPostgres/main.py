@@ -40,7 +40,7 @@ print("Table ready...")
 
 
 # Part 5: Pydantic schemas for input (StudentCreate, StudentUpdate)
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, computed_field
 from fastapi import HTTPException
 
 class StudentCreate(BaseModel): # Pydantic Model
@@ -68,7 +68,25 @@ class StudentUpdate(BaseModel): # Pydantic Model
     course  : str | None = Field(None, min_length=2, max_length=50, description="Course of the student")
     marks   : int | None = Field(None, ge=0, le=100, description="Marks of the student")
     
+    
+    
 # Part 6: Pydantic schemas for output (StudentResponse, StudentPage, Message)
+
+class StudentResponse(BaseModel):
+    @computed_field
+    @property
+    
+    def grade(self) -> str:
+        if self.marks >= 90:
+            return "A+"
+        elif self.marks >= 80:
+            return "A"
+        elif self.marks >= 70:
+            return "B"
+        elif self.marks >= 60:
+            return "C"
+        else:
+            return "F"
 
 
 
