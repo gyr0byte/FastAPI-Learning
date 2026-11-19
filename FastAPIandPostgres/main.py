@@ -68,3 +68,16 @@ class StudentUpdate(BaseModel): # Pydantic Model
     course  : str | None = Field(None, min_length=2, max_length=50, description="Course of the student")
     marks   : int | None = Field(None, ge=0, le=100, description="Marks of the student")
     
+# Part 6: Pydantic schemas for output (StudentResponse, StudentPage, Message)
+
+
+
+# Part 7: getdb() - One session per request
+# Opens a session, gives it to the endpoint, always closes it, replaces load_data/save_data
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+    
