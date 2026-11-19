@@ -44,8 +44,8 @@ from pydantic import BaseModel, Field
 
 class StudentCreate(BaseModel): # Pydantic Model
     id      : str = Field(..., description="Unique identifier for the student")
-    name    : str = Field(..., description="Name of the student")
-    age     : int = Field(..., description="Age of the student")
+    name    : str = Field(..., min_length=2, max_length=50, description="Name of the student")
+    age     : int = Field(..., gt=0, le=100, description="Age of the student")
     email   : str = Field(..., description="Email of the student")
-    course  : str = Field(..., description="Course of the student")
-    marks   : int = Field(..., description="Marks of the student")
+    course  : str = Field(..., min_length=2, max_length=50, description="Course of the student")
+    marks   : int = Field(..., ge=0, le=100, description="Marks of the student")
