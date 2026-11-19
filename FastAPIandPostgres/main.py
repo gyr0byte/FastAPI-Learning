@@ -75,7 +75,8 @@ class StudentUpdate(BaseModel): # Pydantic Model
 class StudentResponse(StudentCreate): # Pydantic Model
     
     model_config = ConfigDict(
-        from_attributes=True,  # This allows Pydantic to read from SQLAlchemy
+        from_attributes=True,  # This allows Pydantic to read from SQLAlchemy, aslo
+                                # read it from the database and return it as a response
     )
     
     @computed_field
