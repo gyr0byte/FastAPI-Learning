@@ -97,4 +97,8 @@ def get_student(
     student_id : str = Path(..., description="The ID of the student to retrieve"),
     db : Session = Depends(get_db) # This is the session that will be used to query the database
 ):
-    student = db.get(StudentDB, student_id)
+    student = db.get(StudentDB, student_id) # SELECT * FROM student_records WHERE id = student_id
+    if not student:
+        raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found")
+    
+    return student
