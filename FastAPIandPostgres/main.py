@@ -40,7 +40,7 @@ print("Table ready...")
 
 
 # Part 5: Pydantic schemas for input (StudentCreate, StudentUpdate)
-from pydantic import BaseModel, Field, field_validator, computed_field
+from pydantic import BaseModel, Field, field_validator, computed_field, ConfigDict
 from fastapi import HTTPException
 
 class StudentCreate(BaseModel): # Pydantic Model
@@ -72,10 +72,14 @@ class StudentUpdate(BaseModel): # Pydantic Model
     
 # Part 6: Pydantic schemas for output (StudentResponse, StudentPage, Message)
 
-class StudentResponse(BaseModel):
+class StudentResponse(StudentCreate): # Pydantic Model
+    
+    model_config = ConfigDict(
+        from_attributes=True,  # This allows Pydantic to read from SQLAlchemy
+    )
+    
     @computed_field
     @property
-    
     def grade(self) -> str:
         if self.marks >= 90:
             return "A+"
@@ -110,7 +114,7 @@ app = FastAPI()
 
 
 # Part 9: GET one student
-@app.get("/students/{student_id}")
+@app.get("/students/{student_id}", response_model=StudentResponse)
 def get_student(
     student_id : str = Path(..., description="The ID of the student to retrieve"),
     db : Session = Depends(get_db) # This is the session that will be used to query the database
