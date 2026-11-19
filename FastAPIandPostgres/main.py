@@ -59,3 +59,12 @@ class StudentCreate(BaseModel): # Pydantic Model
         if not value.replace(" ", "").isalpha():
             raise HTTPException(status_code=400, detail="Name must contain only alphabetic characters and spaces")
         return value.title()  # Capitalize the first letter of each word
+
+class StudentUpdate(BaseModel): # Pydantic Model
+    id      : str | None = Field(None, description="Unique identifier for the student")
+    name    : str | None = Field(None, min_length=2, max_length=50, description="Name of the student")
+    age     : int | None = Field(None, gt=0, le=100, description="Age of the student")
+    email   : str | None = Field(None, description="Email of the student")
+    course  : str | None = Field(None, min_length=2, max_length=50, description="Course of the student")
+    marks   : int | None = Field(None, ge=0, le=100, description="Marks of the student")
+    
