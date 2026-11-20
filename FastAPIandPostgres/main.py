@@ -178,6 +178,7 @@ def update_student(
 
     return student
 
+
 # Part 12: DELETE - delete an existing student
 @app.delete("/students/{student_id}", status_code=204)
 def delete_student(
@@ -192,3 +193,19 @@ def delete_student(
     db.commit() # Commit the transaction
     
     return {"detail": f"Student with ID {student_id} deleted successfully"}
+
+
+
+# Part 13: GET - all students (filter + sort + pagination)
+SORT_FIELDS = ["marks", "age", "name"]
+SORT_ORDER = ["asc", "desc"]
+
+@app.get("/students", response_model=list[StudentResponse])
+def get_all(
+    course : str | None = Query(None, description="Filter by course", example="Python"),
+    sort_by : str | None = Query(None, description="Sort by field"),
+    sort_order : str = Query("asc", description="Sort order (asc or desc)"),
+    page : int = Query(1, ge=1, description="Page number"),
+    limit : int = Query(2, ge=1, le=100, description="Number of records per page")
+):
+    
