@@ -126,9 +126,26 @@ def get_student(
     
     return student
 
+
+
 # Part 10: POST - create a new student
+from sqlalchemy.exc import IntegrityError
+
 @app.post("/students", response_model=StudentResponse, status_code=201)
 def create_student(
     student : StudentCreate, # This is the Pydantic model that will be used to validate the request body
     db : Session = Depends(get_db) # This is the session that will be used to query the database
 ):
+    if db.get(StudentDB, student.id):
+        raise HTTPException(status_code=400, detail=f"Student with ID {student.id} already exists")
+    new_student = StudentDB(**student.model_dump()) # Convert Pydantic model to SQLAlchemy model
+    db.add(new_student)
+    db.flush()  # Flush the session to get the new student's ID
+    try:
+        db.commit() # Commit the transaction
+        db.refresh(new_student) # Refresh the instance to get the new data from the database
+    except IntegrityError as e:
+        db.rollback() # Rollback the transaction if there is an error
+        raise HTTPException(status_code=400, detail=f"Integrity error: {str(e)}")
+    
+    return new_student
