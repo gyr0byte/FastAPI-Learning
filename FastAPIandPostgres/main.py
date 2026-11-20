@@ -154,7 +154,7 @@ def create_student(
 # Part 11: PUT - update an existing student
 @app.put("/students/{student_id}")
 def update_student(
-    student : StudentUpdate, # This is the Pydantic model that will be used to validate the request body
+    student_update : StudentUpdate, # This is the Pydantic model that will be used to validate the request body
     student_id : str = Path(..., description="The ID of the student to update"),
     db : Session = Depends(get_db) # This is the session that will be used to query the database
 ): 
@@ -162,7 +162,7 @@ def update_student(
     if not student:
         raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found")
     
-    changes = student.model_dump(exclude_unset=True) # Get the current state of the student
+    changes = student_update.model_dump(exclude_unset=True) # Get the current state of the student
 
     for key, value in changes.items():
         if value is not None:
