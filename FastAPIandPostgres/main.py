@@ -125,3 +125,10 @@ def get_student(
         raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found")
     
     return student
+
+# Part 10: POST - create a new student
+@app.post("/students", response_model=StudentResponse, status_code=201)
+def create_student(
+    student : StudentCreate, # This is the Pydantic model that will be used to validate the request body
+    db : Session = Depends(get_db) # This is the session that will be used to query the database
+):
