@@ -149,3 +149,13 @@ def create_student(
         raise HTTPException(status_code=400, detail=f"Integrity error: {str(e)}")
     
     return new_student
+
+
+# Part 11: PUT - update an existing student
+@app.put("/students/{student_id}")
+def update_student(
+    student : StudentUpdate, # This is the Pydantic model that will be used to validate the request body
+    student_id : str = Path(..., description="The ID of the student to update"),
+    db : Session = Depends(get_db) # This is the session that will be used to query the database
+): 
+    pass
