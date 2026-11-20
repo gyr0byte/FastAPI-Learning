@@ -20,7 +20,6 @@ class Base(DeclarativeBase):
     pass
 
 SessionLocal = sessionmaker(bind=engine)
-db = SessionLocal()
 
 # Part 4: Create the StudentDB table
 class StudentDB(Base):
@@ -178,3 +177,11 @@ def update_student(
         raise HTTPException(status_code=400, detail=f"Integrity error: {str(e)}")
 
     return student
+
+# Part 12: DELETE - delete an existing student
+@app.delete("/students/{student_id}", status_code=204)
+def delete_student(
+    student_id : str = Path(..., description="The ID of the student to delete"),
+    db : Session = Depends(get_db) # This is the session that will be used to query the database
+):
+    
