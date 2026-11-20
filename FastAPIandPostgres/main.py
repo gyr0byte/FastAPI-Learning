@@ -206,6 +206,14 @@ def get_all(
     sort_by : str | None = Query(None, description="Sort by field"),
     sort_order : str = Query("asc", description="Sort order (asc or desc)"),
     page : int = Query(1, ge=1, description="Page number"),
-    limit : int = Query(2, ge=1, le=100, description="Number of records per page")
+    limit : int = Query(2, ge=1, le=100, description="Number of records per page"),
+    db : Session = Depends(get_db) # This is the session that will be used to query the database
 ):
+    if sort_by is not None and sort_by not in SORT_FIELDS:
+        raise HTTPException(status_code=400, detail=f"Invalid sort field. Must be one of {SORT_FIELDS}")
+
+    if sort_order not in SORT_ORDER:
+        raise HTTPException(status_code=400, detail=f"Invalid sort order. Must be one of {SORT_ORDER}")
+    
+    
     
