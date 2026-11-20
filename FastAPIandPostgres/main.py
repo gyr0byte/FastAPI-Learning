@@ -184,4 +184,11 @@ def delete_student(
     student_id : str = Path(..., description="The ID of the student to delete"),
     db : Session = Depends(get_db) # This is the session that will be used to query the database
 ):
+    student = db.get(StudentDB, student_id) # SELECT * FROM student_records WHERE id = student_id
+    if student is None:
+        raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found")
     
+    db.delete(student) # DELETE FROM student_records WHERE id = student_id
+    db.commit() # Commit the transaction
+    
+    return {"detail": f"Student with ID {student_id} deleted successfully"}
