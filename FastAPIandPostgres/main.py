@@ -170,4 +170,11 @@ def update_student(
         else:
             raise HTTPException(status_code=400, detail=f"Field {key} cannot be None")
     
-    
+    try:
+        db.commit() # Commit the transaction
+        db.refresh(student) # Refresh the instance to get the new data from the database
+    except IntegrityError as e:
+        db.rollback() # Rollback the transaction if there is an error
+        raise HTTPException(status_code=400, detail=f"Integrity error: {str(e)}")
+
+    return student
