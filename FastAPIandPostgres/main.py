@@ -6,7 +6,7 @@ load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
 # Part 2: Create an engine to connect to the database
-from sqlalchemy import create_engine, text, Column, Integer, String
+from sqlalchemy import create_engine, func, text, Column, Integer, String
 engine = create_engine(DATABASE_URL)
 with engine.connect() as connection:
     version = connection.execute(text("SELECT version();")).scalar()
@@ -215,5 +215,18 @@ def get_all(
     if sort_order not in SORT_ORDER:
         raise HTTPException(status_code=400, detail=f"Invalid sort order. Must be one of {SORT_ORDER}")
     
+    query = db.query(StudentDB) # SELECT * FROM student_records
     
+    if course:
+        query = query.filter(func.lower(StudentDB.course) == course.lower()) # SELECT * FROM student_records WHERE course = course
     
+    total_students = query.count() # Get the total number of students after filtering
+    
+    if sort_by:
+        column = getattr(StudentDB, sort_by) # Get the column object from the StudentDB class
+        if sort_order == "asc":
+            query = query.order_by(column.asc()) # ORDER BY column ASC
+        else:
+            query = query.order_by(column.desc()) # ORDER BY column DESC
+
+    query = query.offset((page - 1) * limit).limit(limit) # Apply pagination
