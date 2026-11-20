@@ -228,5 +228,12 @@ def get_all(
             query = query.order_by(column.asc()) # ORDER BY column ASC
         else:
             query = query.order_by(column.desc()) # ORDER BY column DESC
-
+            
     query = query.offset((page - 1) * limit).limit(limit) # Apply pagination
+
+    return {
+        "page": page,
+        "limit": limit,
+        "total_students": total_students,
+        "students": query.all()  # Execute the query and return the results
+    }
