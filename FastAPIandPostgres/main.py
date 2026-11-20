@@ -158,4 +158,16 @@ def update_student(
     student_id : str = Path(..., description="The ID of the student to update"),
     db : Session = Depends(get_db) # This is the session that will be used to query the database
 ): 
-    pass
+    student = db.get(StudentDB, student_id) # SELECT * FROM student_records WHERE id = student_id
+    if not student:
+        raise HTTPException(status_code=404, detail=f"Student with ID {student_id} not found")
+    
+    changes = student.model_dump(exclude_unset=True) # Get the current state of the student
+
+    for key, value in changes.items():
+        if value is not None:
+            setattr(student, key, value) # Update the student with the new values
+        else:
+            raise HTTPException(status_code=400, detail=f"Field {key} cannot be None")
+    
+    
