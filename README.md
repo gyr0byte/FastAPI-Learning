@@ -38,7 +38,7 @@
 
 This repository documents a personal learning journey building RESTful web services with FastAPI and Python. Created while following along with a comprehensive video tutorial, each file and commit reflects an incremental step in mastering core backend topics—starting with simple route decorators, progressing to path and query parameters, exploring Pydantic data modeling, and finally integrating CRUD operations with persistent storage.
 
-To put these backend principles into real-world practice, the repository also includes a complete **Student Registry** project powered by the learning API (with both Streamlit and vanilla web frontends), followed by an isolated deep dive into relational databases using **PostgreSQL** and **SQLAlchemy 2.0 ORM** to prepare for full database-backed APIs.
+To put these backend principles into real-world practice, the repository also includes a complete **Student Registry** project powered by the learning API (with both Streamlit and vanilla web frontends), followed by a full architectural evolution to relational databases using **PostgreSQL** and **SQLAlchemy 2.0 ORM**—spanning both an initial prototyping script ([playground.py](FastAPIandPostgres/playground.py)) and a complete production-style database API ([FastAPIandPostgres/main.py](FastAPIandPostgres/main.py)).
 
 > [!NOTE]
 > This is primarily an educational codebase built to master FastAPI concepts through practical experimentation.
@@ -65,7 +65,8 @@ flowchart TD
     I --> J["10. Resource Deletion"]
     J --> K["11. CORS Middleware"]
     K --> L["12. Full-Stack Frontends"]
-    L --> M["13. PostgreSQL & SQLAlchemy ORM"]
+    L --> M["13. Standalone ORM Exploration<br/>(playground.py)"]
+    M --> N["14. Production Database API<br/>(FastAPIandPostgres/main.py)"]
 ```
 
 <sub><a href="#fastapi-learning-journey">↑ Back to top</a></sub>
