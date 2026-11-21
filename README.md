@@ -526,105 +526,103 @@ flowchart LR
 
 ## PostgreSQL and SQLAlchemy ORM
 
-To transition from flat-file storage toward production-grade persistence, the repository explores relational database management and object-relational mapping (ORM) in [`FastAPIandPostgres/playground.py`](FastAPIandPostgres/playground.py). 
+To transition from flat-file storage toward production-grade persistence, the repository explores relational database management and object-relational mapping (ORM) in the [`FastAPIandPostgres/`](FastAPIandPostgres/) directory across two distinct phases:
 
-This script intentionally isolates the database layer to test direct communication with PostgreSQL using **SQLAlchemy 2.0** before wiring sessions and models into FastAPI route handlers.
+1. **Phase 1: Standalone ORM Exploration ([playground.py](FastAPIandPostgres/playground.py))**: Testing direct PostgreSQL communication and SQLAlchemy 2.0 ORM patterns in isolation without any web framework.
+2. **Phase 2: Database-Backed FastAPI Service ([main.py](FastAPIandPostgres/main.py))**: A complete production-style REST API integrating FastAPI, SQLAlchemy sessions via dependency injection, and Pydantic v2 ORM serialization.
 
-### Key Concepts Explored
+---
 
-1. **Environment Configuration (`python-dotenv`):**
-   - Keeps credentials out of source control using `.env` (with a sample template provided in [`.env.example`](.env.example)).
-   - Reads `DATABASE_URL` dynamically using `os.getenv("DATABASE_URL")`.
+### Phase 1: Standalone ORM Exploration (`playground.py`)
 
-2. **Connection & Engine (`create_engine`):**
-   - Creates the engine ("the road to the database") and executes a raw verification query (`SELECT version();`) inside a context-managed connection.
+This script isolates the database layer to test direct communication with PostgreSQL using **SQLAlchemy 2.0** before wiring sessions and models into FastAPI route handlers.
 
-3. **Declarative ORM Modeling (`DeclarativeBase`):**
-   - Defines a `StudentDB` class inheriting from SQLAlchemy's modern `DeclarativeBase`.
-   - Maps class attributes to the `student_records` table with explicit column types, constraints, and keys:
-     - `id`: String primary key (e.g. `"S001"`).
-     - `name`: String (length 50, `nullable=False`).
-     - `age`: Integer (`nullable=False`).
-     - `course`: String (length 50, `nullable=False`).
-     - `marks`: Integer (`nullable=False`).
-     - `email`: String (`unique=True`, `nullable=False`).
-
-4. **Schema Migration & Table Creation (`Base.metadata.create_all`):**
-   - Binds to the engine and issues `CREATE TABLE IF NOT EXISTS` statements automatically.
-
-5. **Session Management & CRUD Operations (`sessionmaker`):**
-   - **Session Lifecycle:** `SessionLocal = sessionmaker(bind=engine)` creates scoped sessions for database transactions.
-   - **Create (Insert):** Adds a record via `db.add(StudentDB(...))` and saves with `db.commit()` only if the record doesn't already exist (`if db.get(StudentDB, "S001") is None:`).
-   - **Read (Query):** Queries all records using `db.query(StudentDB).all()`.
-   - **Update (Mutate):** Retrieves an entity by primary key using `db.get(StudentDB, "S001")`, modifies attributes in Python (`gaurav.marks = 95`), and persists the change with `db.commit()`.
-
-### Code Walkthrough
-
-```python
-import os
-from dotenv import load_dotenv
-from sqlalchemy import Column, Integer, String, create_engine, text
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
-
-# Step 1: Load environment variables
-load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-# Step 2: Create engine & test connection
-engine = create_engine(DATABASE_URL)
-with engine.connect() as connection:
-    version = connection.execute(text("SELECT version();")).scalar()
-    print(f"Connected to PostgreSQL: {version.split(',')[0]}")
-
-# Step 3: Define Declarative ORM model
-class Base(DeclarativeBase):
-    pass
-
-class StudentDB(Base):
-    __tablename__ = "student_records"
-    id      = Column(String, primary_key=True)
-    name    = Column(String(50), nullable=False)
-    age     = Column(Integer, nullable=False)
-    course  = Column(String(50), nullable=False)
-    marks   = Column(Integer, nullable=False)
-    email   = Column(String, unique=True, nullable=False)
-
-# Create table schema
-Base.metadata.create_all(bind=engine)
-
-# Step 4: Session operations (Create & Update)
-SessionLocal = sessionmaker(bind=engine)
-db = SessionLocal()
-
-if db.get(StudentDB, "S001") is None:
-    db.add(StudentDB(
-        id="S001", name="Gaurav Dulal", age=20,
-        course="AI", marks=94, email="gqurav69@gmail.com"
-    ))
-    db.commit()
-
-# Mutate and commit update
-gaurav = db.get(StudentDB, "S001")
-gaurav.marks = 95
-db.commit()
-print(f"Updated Marks for {gaurav.name}: {gaurav.marks}")
-```
-
-### Running the Database Playground
+#### Key Concepts Explored
+- **Environment Configuration (`python-dotenv`):** Loads `DATABASE_URL` dynamically from `.env` (template in [`.env.example`](.env.example)).
+- **Connection & Engine (`create_engine`):** Connects to the database and executes a raw verification query (`SELECT version();`).
+- **Declarative ORM Modeling (`DeclarativeBase`):** Defines `StudentDB` mapping to the `student_records` table with primary key `id`, constraints (`nullable=False`), and unique email addresses.
+- **Table Generation (`create_all`):** Issues automatic `CREATE TABLE IF NOT EXISTS` commands against PostgreSQL.
+- **Session Lifecycle & CRUD (`sessionmaker`):**
+  - **Insert:** Adds record conditionally (`if db.get(StudentDB, "S001") is None:`) and commits.
+  - **Read:** Queries records via `db.query(StudentDB).all()`.
+  - **Update:** Mutates model attributes directly in Python (`gaurav.marks = 95`) and persists with `db.commit()`.
 
 ```powershell
-# 1. Create .env from template
-cp .env.example .env
-
-# 2. Configure DATABASE_URL in .env:
-# DATABASE_URL="postgresql://username:password@localhost:5432/fastapi_db"
-
-# 3. Run the playground script:
+# Run the standalone ORM playground:
 python FastAPIandPostgres/playground.py
 ```
 
-> [!TIP]
-> **Learning Strategy:** Practicing SQLAlchemy in a standalone script before introducing FastAPI's `Depends` dependency injection simplifies debugging and ensures the database connection, ORM mappings, and transaction flows work independently.
+---
+
+### Phase 2: Database-Backed FastAPI Service (`FastAPIandPostgres/main.py`)
+
+This service represents the next evolutionary milestone in the learning path: replacing flat-file JSON persistence with a real PostgreSQL database, request-scoped session dependencies, and standard RESTful routes.
+
+#### Architecture Patterns & Best Practices
+
+1. **Session Lifecycle via Dependency Injection (`get_db`):**
+   Instead of global file reads/writes, endpoints request a database session using FastAPI's `Depends(get_db)`. The generator opens a session, yields it to the handler, and guarantees closure in a `finally` block:
+   ```python
+   def get_db():
+       db = SessionLocal()
+       try:
+           yield db
+       finally:
+           db.close()
+   ```
+
+2. **Pydantic v2 ORM Mode (`from_attributes=True`):**
+   `StudentResponse` inherits from `StudentCreate` and enables `from_attributes=True` via `ConfigDict`. This allows Pydantic to read attributes directly from SQLAlchemy ORM instances and serialize them into JSON HTTP responses, while computing grades dynamically:
+   ```python
+   class StudentResponse(StudentCreate):
+       model_config = ConfigDict(from_attributes=True)
+       
+       @computed_field
+       @property
+       def grade(self) -> str:
+           if self.marks >= 90: return "A+"
+           elif self.marks >= 80: return "A"
+           elif self.marks >= 70: return "B"
+           elif self.marks >= 60: return "C"
+           else: return "F"
+   ```
+
+3. **Transaction Management & Error Handling:**
+   - Pre-flight checks verify primary key uniqueness (`if db.get(StudentDB, student.id): raise HTTPException(400)`).
+   - Writes are wrapped in `try...except IntegrityError` blocks with `db.rollback()` to prevent corrupted transaction states.
+   - Partial updates use `model_dump(exclude_unset=True)` combined with `setattr(student, key, value)`.
+
+4. **Canonical RESTful Route Endpoints:**
+
+| Method | Endpoint | Description | Status Code | Error Codes |
+|---|---|---|---|---|
+| `POST` | `/students` | Create new student from `StudentCreate` model | `201 Created` | `400` (duplicate ID / integrity) |
+| `GET` | `/students/{student_id}` | Retrieve student by ID as `StudentResponse` | `200 OK` | `404` (not found) |
+| `PUT` | `/students/{student_id}` | Partial update using `StudentUpdate` model | `200 OK` | `400` (integrity), `404` |
+| `DELETE` | `/students/{student_id}` | Remove student record via `db.delete()` | `204 No Content` | `404` (not found) |
+| `GET` | `/students` | Filter by `course`, sort (`marks`\|`age`\|`name`), and paginate | `200 OK` | `400` (invalid sort params) |
+
+5. **SQL-Level Filtering, Sorting, and Pagination:**
+   The `GET /students` endpoint handles querying directly within PostgreSQL:
+   ```python
+   query = db.query(StudentDB)
+   if course:
+       query = query.filter(func.lower(StudentDB.course) == course.lower())
+   total_students = query.count()
+   if sort_by:
+       column = getattr(StudentDB, sort_by)
+       query = query.order_by(column.asc() if sort_order == "asc" else column.desc())
+   results = query.offset((page - 1) * limit).limit(limit).all()
+   ```
+
+#### Running the Database-Backed API
+
+```powershell
+# Run on port 8001 (allowing root API on 8000 and database API on 8001 to run simultaneously):
+uvicorn FastAPIandPostgres.main:app --reload --port 8001
+```
+
+- Interactive Swagger Docs: [http://127.0.0.1:8001/docs](http://127.0.0.1:8001/docs)
 
 <sub><a href="#fastapi-learning-journey">↑ Back to top</a></sub>
 
@@ -634,7 +632,7 @@ python FastAPIandPostgres/playground.py
 
 ```text
 FastAPI-Learning/
-├── main.py                          # FastAPI service: endpoints, Pydantic models, CORS, and persistence
+├── main.py                          # Original FastAPI service: endpoints, Pydantic models, and JSON storage
 ├── app.py                           # Streamlit dashboard: analytics, roster management, and modal dialogs
 ├── pydantic_basics.py               # Standalone teaching script: 7-step Pydantic fundamentals walkthrough
 ├── students.json                    # Flat JSON storage: student records keyed by student ID
@@ -645,11 +643,12 @@ FastAPI-Learning/
 ├── assets/
 │   └── banner.svg                   # Custom hand-crafted repository header banner
 ├── FastAPIandPostgres/
-│   └── playground.py                # Standalone SQLAlchemy 2.0 & PostgreSQL CRUD playground script
+│   ├── playground.py                # Phase 1: Standalone SQLAlchemy 2.0 & PostgreSQL CRUD playground script
+│   └── main.py                      # Phase 2: Complete database-backed FastAPI service with Dependency Injection
 └── web/
-    ├── index.html       # Vanilla HTML semantic structure for web UI
-    ├── styles.css       # Complete responsive CSS styles, design tokens, and theme rules
-    └── app.js           # Vanilla ES6+ JavaScript API client and interactive UI logic
+    ├── index.html                   # Vanilla HTML semantic structure for web UI
+    ├── styles.css                   # Complete responsive CSS styles, design tokens, and theme rules
+    └── app.js                       # Vanilla ES6+ JavaScript API client and interactive UI logic
 ```
 
 <sub><a href="#fastapi-learning-journey">↑ Back to top</a></sub>
@@ -674,14 +673,15 @@ FastAPI-Learning/
 - [x] Cross-Origin Resource Sharing (CORS) with `CORSMiddleware`
 - [x] Analytical frontend with Streamlit, Altair, and `@st.dialog`
 - [x] Zero-build vanilla web frontend with HTML5 `<dialog>` and sliding drawer
-- [x] PostgreSQL database integration & SQLAlchemy 2.0 ORM playground (engine connection, DeclarativeBase modeling, table creation, and session CRUD)
+- [x] Standalone PostgreSQL & SQLAlchemy 2.0 ORM playground (`FastAPIandPostgres/playground.py`)
+- [x] Full database-backed FastAPI service (`FastAPIandPostgres/main.py`) with session dependency (`get_db`), Pydantic ORM serialization (`from_attributes=True`), transaction rollbacks on `IntegrityError`, and canonical REST endpoints
 
 ### Ideas for Next Steps
 
-- [ ] **Database Integration in FastAPI**: Wire SQLAlchemy database sessions into FastAPI route handlers using dependency injection (`Depends`) to replace flat-file JSON persistence in `main.py`.
-- [ ] **User Authentication**: Implement JWT token authentication and password hashing using OAuth2 password flow.
-- [ ] **Automated Testing**: Write unit and integration test suites using `pytest` and `httpx.AsyncClient`.
-- [ ] **Containerization**: Add a `Dockerfile` and `docker-compose.yml` for unified one-command deployment.
+- [ ] **Database Migrations with Alembic**: Track and apply incremental schema changes and database migrations.
+- [ ] **User Authentication & Security**: Implement JWT token authentication and password hashing with `passlib`/`bcrypt`.
+- [ ] **Automated Testing**: Write unit and integration test suites using `pytest`, `httpx.AsyncClient`, and a test database fixture.
+- [ ] **Containerization**: Add a `Dockerfile` and `docker-compose.yml` for unified one-command deployment of FastAPI and PostgreSQL.
 
 <sub><a href="#fastapi-learning-journey">↑ Back to top</a></sub>
 
@@ -689,15 +689,15 @@ FastAPI-Learning/
 
 ## Known Limitations
 
-1. **File-Based Concurrency in Main API**: The primary FastAPI service ([main.py](main.py)) still relies on `students.json` without file locking. PostgreSQL and SQLAlchemy integration has begun in [FastAPIandPostgres/playground.py](FastAPIandPostgres/playground.py) and is slated to be wired into `main.py` in the next phase.
-2. **Wildcard CORS Configuration**: The API is configured with `allow_origins=["*"]`, which is suitable for local development but too permissive for production environments.
-3. **Model Validation Asymmetry**: Validation bounds differ between `Student` and `StudentUpdate` in [main.py](main.py):
-   - `name`: max 100 characters on create vs. max 50 on update.
-   - `age`: $\le 100$ on create vs. $< 100$ (max 99) on update.
-   - `course`: minimum length of 2 characters required on create, but no minimum length on update.
-4. **Non-Standard Sort Status Code**: Passing invalid `sort_by` or `order` values to `/sort` returns `HTTP 404` instead of standard client error codes (`400 Bad Request` or `422 Unprocessable Entity`).
-5. **Non-RESTful Route Verbs**: Endpoints use action verbs in paths (e.g. `/create`, `/delete/{student_id}`) rather than canonical RESTful resource patterns (`POST /student`, `DELETE /student/{id}`).
-6. **No Authentication or Authorization**: All endpoints are public and allow unauthenticated reads, writes, and deletions.
+1. **Two Backend Implementations**:
+   - The root service ([main.py](main.py)) represents the initial tutorial phase relying on flat-file storage (`students.json`) without concurrency locking.
+   - The relational database service ([FastAPIandPostgres/main.py](FastAPIandPostgres/main.py)) resolves this by leveraging PostgreSQL transactions with `IntegrityError` rollback handling.
+2. **Wildcard CORS Configuration**: The original API is configured with `allow_origins=["*"]`, which is suitable for local development but too permissive for production environments.
+3. **Model Validation Asymmetry in Original API**: Validation bounds differ between `Student` and `StudentUpdate` in [main.py](main.py) (e.g., max name length 100 vs. 50). This was standardized in `FastAPIandPostgres/main.py`.
+4. **Non-Standard Sort Status Code in Original API**: Passing invalid `sort_by` or `order` values to `/sort` in `main.py` returns `HTTP 404` instead of `HTTP 400` (fixed to `HTTP 400` in `FastAPIandPostgres/main.py`).
+5. **Non-RESTful Route Verbs in Original API**: Root endpoints use action verbs in paths (e.g. `/create`, `/delete/{student_id}`), whereas `FastAPIandPostgres/main.py` adopts canonical REST paths (`POST /students`, `DELETE /students/{id}`).
+6. **No Authentication or Authorization**: Endpoints in both services are public and allow unauthenticated operations.
+7. **Paginated Route Response Model in Database API**: In [FastAPIandPostgres/main.py](FastAPIandPostgres/main.py#L202), `@app.get("/students", response_model=list[StudentResponse])` specifies a list response model on the decorator, while the endpoint returns a paginated dictionary structure (`{"page": ..., "limit": ..., "total_students": ..., "students": [...]}`).
 
 <sub><a href="#fastapi-learning-journey">↑ Back to top</a></sub>
 
