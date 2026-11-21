@@ -412,9 +412,9 @@ To run the Streamlit frontend, install its specific client libraries:
 pip install "streamlit>=1.50.0" pandas altair requests
 ```
 
-### 4. (Optional) Database Setup for PostgreSQL Playground
+### 4. (Optional) Database Setup for PostgreSQL
 
-To run the PostgreSQL and SQLAlchemy playground script:
+To run the PostgreSQL and SQLAlchemy scripts:
 
 ```powershell
 # Copy the environment template
@@ -425,6 +425,12 @@ cp .env.example .env
 
 # Install database dependencies
 pip install sqlalchemy python-dotenv psycopg2-binary
+
+# Run the standalone ORM playground:
+python FastAPIandPostgres/playground.py
+
+# Run the PostgreSQL-backed FastAPI service:
+uvicorn FastAPIandPostgres.main:app --reload --port 8001
 ```
 
 <sub><a href="#fastapi-learning-journey">↑ Back to top</a></sub>
